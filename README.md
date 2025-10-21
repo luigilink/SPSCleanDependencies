@@ -21,7 +21,7 @@ It's compatible with all supported versions for SharePoint OnPremises (2016 to S
 Required because this module now implements class-based resources.
 Class-based resources can only work on computers with Windows rManagement Framework 5.0 or above.
 The preferred version is PowerShell 5.1 or higher, which ships with Windows 10 or Windows Server 2016.
-This is discussed further on the [SPSUpdate Wiki Getting-Started](https://github.com/luigilink/SPSUpdate/wiki/Getting-Started)
+This is discussed further on the [SPSCleanDependencies Wiki Getting-Started](https://github.com/luigilink/SPSCleanDependencies/wiki/Getting-Started)
 
 ### SqlServer PowerShell Module
 
