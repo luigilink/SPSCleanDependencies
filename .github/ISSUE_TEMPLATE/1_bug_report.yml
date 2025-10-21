@@ -33,8 +33,8 @@ body:
       label: Version
       description: What version of our software are you running?
       options:
-        - 1.0.2
-        - 1.0.1
+        - 1.1.x
+        - 1.0.x
       default: 0
     validations:
       required: true
@@ -44,7 +44,6 @@ body:
       label: What version of PowerShell are you running?
       multiple: true
       options:
-        - 4.x
         - 5.x
         - 7.x
   - type: textarea
