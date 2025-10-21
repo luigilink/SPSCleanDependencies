@@ -3,6 +3,25 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-10-21
+
+### Changed
+
+- SPSCleanDependencies.ps1:
+  - Resolve Invoke-Sqlcmd does not work because sqlserver is not present [issue #2](https://github.com/luigilink/SPSCleanDependencies/issues/2)
+  - Resolve Performing the operation "Set-SPSite" on target "*sitemaster-*" [issue #3](https://github.com/luigilink/SPSCleanDependencies/issues/3)
+
+- Wiki Documentation in repository - Update :
+  - wiki/Home.md
+  - wiki/Getting-Started.md
+  - wiki/Usage.md
+
+- Issue Templates files:
+  - 1_bug_report.yml Update version
+
+- README.md
+  - Add Requirements for PowerShell 5 and SqlServer PowerShell Module
+
 ## [1.0.0] - 2025-04-04
 
 ### Added

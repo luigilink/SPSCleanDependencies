@@ -4,8 +4,8 @@
 
 | Parameter   | Description                                        |
 | ----------- | -------------------------------------------------- |
-| `-FileName` | Specifies the name of the configuration json file. |
-| `-Clean`    | Remove missing server side dependencies            |
+| `FileName` | Specifies the name of the configuration json file. |
+| `Clean`    | Remove missing server side dependencies            |
 
 ### Basic Usage Example
 

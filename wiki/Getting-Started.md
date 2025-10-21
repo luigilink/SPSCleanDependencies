@@ -4,6 +4,7 @@
 
 - PowerShell 5.0 or later
 - Administrative privileges on the SharePoint Server
+- Module SqlServer
 
 ## Installation
 

@@ -1,6 +1,6 @@
-# SPSCleanDependencies - SharePoint Trust Farm Tool
+# SPSCleanDependencies - SharePoint SPSCleanDependencies Farm Tool
 
-SPSCleanDependencies is a PowerShell script tool to configure trust Farm in your SharePoint environment.
+SPSCleanDependencies is a PowerShell script tool to clean Missing Server Dependencies in your SharePoint Farm.
 
 ## Key Features
 

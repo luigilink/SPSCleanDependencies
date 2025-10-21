@@ -22,8 +22,8 @@
     .NOTES
     FileName:	SPSCleanDependencies.ps1
     Author:		luigilink (Jean-Cyril DROUHIN)
-    Date:		April 04, 2025
-    Version:	1.0.0
+    Date:		October 21, 2025
+    Version:	1.1.0
 
     .LINK
     https://spjc.fr/
@@ -39,22 +39,48 @@ param(
     $Clean
 )
 
+#requires -Version 5.1
+
 #region Initialization
 # Clear the host console
 Clear-Host
 
 # Set the window title
-$Host.UI.RawUI.WindowTitle = "SPSTrust script running on $env:COMPUTERNAME"
+$Host.UI.RawUI.WindowTitle = "SPSCleanDependencies script running on $env:COMPUTERNAME"
 
 # Define the path to the helper module
 $scriptRootPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $script:HelperModulePath = Join-Path -Path $scriptRootPath -ChildPath 'Modules'
 
 # Import the helper module
-Import-Module -Name (Join-Path -Path $script:HelperModulePath -ChildPath 'SPSCleanDependencies.util.psm1') -Force -DisableNameChecking
+try {
+    Import-Module -Name (Join-Path -Path $script:HelperModulePath -ChildPath 'SPSCleanDependencies.util.psm1') -Force -DisableNameChecking
+}
+catch {
+    # Handle errors during Import of helper module
+    Write-Error -Message @"
+Failed to import helper module from path: $($script:HelperModulePath)
+Exception: $_
+"@
+    Exit
+}
+
+# Import SQL Server PowerShell module
+try {
+    Import-Module -Name SqlServer -ErrorAction Stop
+}
+catch {
+    # Handle errors during Import of helper module
+    Write-Error -Message @"
+Failed to import helper module SqlServer.
+Please install the SqlServer module from the PowerShell Gallery or ensure it is available on this system.
+Exception: $_
+"@
+    Exit
+}
 
 # Define variable
-$SPSCleanDependenciesVersion = '1.0.0'
+$SPSCleanDependenciesVersion = '1.1.0'
 $currentUser = ([Security.Principal.WindowsIdentity]::GetCurrent()).Name
 $scriptRootPath = Split-Path -parent $MyInvocation.MyCommand.Definition
 $pathLogsFolder = Join-Path -Path $scriptRootPath -ChildPath 'Logs' -ErrorAction SilentlyContinue
@@ -128,9 +154,12 @@ if ($Clean) {
             $sitesWithClassicAuth = Get-SPSite -Limit ALL | Where-Object -FilterScript { $_.Owner -notlike 'i:0#.w|*' }
             if ($null -ne $sitesWithClassicAuth) {
                 foreach ($site in $sitesWithClassicAuth) {
-                    Write-Output "Updating SPSite Owner of $($site.Url)"
-                    Write-Output "User $($site.Owner) replaced by $($defautSPSiteOwner)"
-                    Set-SPSite $site -OwnerAlias "$($defautSPSiteOwner)" -Verbose
+                    if ($site.Url -notlike '*sitemaster-*') {
+                        Write-Output "Site $($site.Url) has Classic Authentication Owner: $($site.Owner)"
+                        Write-Output "Updating SPSite Owner of $($site.Url)"
+                        Write-Output "User $($site.Owner) replaced by $($defautSPSiteOwner)"
+                        Set-SPSite $site -OwnerAlias "$($defautSPSiteOwner)" -Verbose
+                    }
                 }
             }
             Write-Output 'Removing Missing Configuration References'
@@ -146,7 +175,7 @@ if ($Clean) {
     }
 }
 else {
-    Write-Output 'Getting Missing Server Side Dependencies'    
+    Write-Output 'Getting Missing Server Side Dependencies'
     Get-SPSMissingServerDependencies -Path $pathJsonFile
 }
 #endregion
@@ -155,7 +184,7 @@ else {
 Trap { Continue }
 $DateEnded = Get-Date
 Write-Output '-----------------------------------------------'
-Write-Output "| SPSTrust Script Completed"
+Write-Output "| SPSCleanDependencies Script Completed"
 Write-Output "| Started on  - $DateStarted"
 Write-Output "| Ended on    - $DateEnded"
 Write-Output '-----------------------------------------------'
