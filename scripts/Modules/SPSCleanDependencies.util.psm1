@@ -328,8 +328,6 @@ SELECT [tp_SiteID],[tp_Login] FROM [UserInfo] WITH (NOLOCK) WHERE tp_IsActive = 
     return $tbSQLmissingConfigurations
 }
 
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '',
-    Justification = 'Public function name kept for backward compatibility with existing callers and documentation.')]
 function Get-SPSMissingServerDependencies {
     param
     (

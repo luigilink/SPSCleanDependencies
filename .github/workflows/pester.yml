@@ -71,7 +71,7 @@ jobs:
           $scriptFiles = Get-ChildItem -Path ./scripts -Include '*.ps1', '*.psm1' -Recurse
 
           $results = $scriptFiles | ForEach-Object {
-            Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error,Warning
+            Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error,Warning -Settings ./PSScriptAnalyzerSettings.psd1
           }
 
           if ($results) {

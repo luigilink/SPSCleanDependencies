@@ -21,7 +21,7 @@
 
 ### Fixed
 
-- Replace `Write-Host` with `Write-Output` in `Remove-SPSMissingSetupFile` and clear remaining `PSScriptAnalyzer` warnings.
+- Replace `Write-Host` with `Write-Output` in `Remove-SPSMissingSetupFile` and clear remaining `PSScriptAnalyzer` warnings via a new `PSScriptAnalyzerSettings.psd1` at the repo root (excluding `PSUseSingularNouns` to preserve the public `Get-SPSMissingServerDependencies` name).
 - Stop hiding real `Import-Module` failures in the module Pester tests so future regressions surface immediately.
 
 A full list of changes in each version can be found in the [change log](CHANGELOG.md)

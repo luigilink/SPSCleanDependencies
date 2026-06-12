@@ -29,7 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - SPSCleanDependencies.util.psm1:
   - Replace `Write-Host` in `Remove-SPSMissingSetupFile` with `Write-Output` (PSScriptAnalyzer `PSAvoidUsingWriteHost`).
-  - Suppress `PSUseSingularNouns` on the public `Get-SPSMissingServerDependencies` function (name preserved for backward compatibility).
+
+- CI / repo configuration:
+  - Add `PSScriptAnalyzerSettings.psd1` at the repo root, excluding `PSUseSingularNouns` so the public `Get-SPSMissingServerDependencies` function can keep its current (plural) name for backward compatibility. The CI workflow now invokes `Invoke-ScriptAnalyzer` with `-Settings ./PSScriptAnalyzerSettings.psd1`.
 
 - tests/Modules/SPSCleanDependencies.util.Tests.ps1:
   - Surface real `Import-Module` failures instead of silently swallowing them with `-ErrorAction SilentlyContinue`, which had been hiding the actual cause of cascading test failures on CI.
