@@ -154,6 +154,25 @@ Describe 'Remove-SPSMissingWebPart Safety Net' {
     }
 }
 
+Describe 'SPSCleanDependencies.util.psm1 ShouldProcess Support' {
+
+    $stateChangingFunctions = @(
+        'Remove-SPSMissingFeature',
+        'Remove-SPSMissingSetupFile',
+        'Remove-SPSMissingWebPart',
+        'Remove-SPSMissingAssembly',
+        'Remove-SPSMissingConfiguration',
+        'Remove-SPSOrphanedSite'
+    )
+
+    It '<_> declares SupportsShouldProcess' -ForEach $stateChangingFunctions {
+        $cmd = Get-Command -Name $_ -ErrorAction Stop
+        # CmdletBinding(SupportsShouldProcess) injects -WhatIf and -Confirm into the function.
+        $cmd.Parameters.Keys | Should -Contain 'WhatIf'
+        $cmd.Parameters.Keys | Should -Contain 'Confirm'
+    }
+}
+
 Describe 'SPSCleanDependencies.util.psm1 Class Definitions' {
 
     BeforeAll {

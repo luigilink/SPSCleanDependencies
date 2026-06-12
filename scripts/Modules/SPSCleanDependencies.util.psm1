@@ -328,6 +328,8 @@ SELECT [tp_SiteID],[tp_Login] FROM [UserInfo] WITH (NOLOCK) WHERE tp_IsActive = 
     return $tbSQLmissingConfigurations
 }
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '',
+    Justification = 'Public function name kept for backward compatibility with existing callers and documentation.')]
 function Get-SPSMissingServerDependencies {
     param
     (
@@ -541,6 +543,7 @@ function Get-SPSMissingServerDependencies {
 }
 
 function Remove-SPSMissingFeature {
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
         [Parameter()]
@@ -571,7 +574,9 @@ function Remove-SPSMissingFeature {
             ForEach ($web in $Site.AllWebs) {
                 if ($web.Features[$featureID]) {
                     Write-Output "`nFound Feature $featureID in web:"$Web.Url"`nRemoving feature"
-                    $web.Features.Remove($featureID, $true)
+                    if ($PSCmdlet.ShouldProcess($Web.Url, "Remove feature $featureID")) {
+                        $web.Features.Remove($featureID, $true)
+                    }
                 }
                 else {
                     Write-Output "`nDid not find feature $featureID in web:" $Web.Url
@@ -580,7 +585,9 @@ function Remove-SPSMissingFeature {
             #Remove the feature from the site collection
             if ($Site.Features[$featureID]) {
                 Write-Output "`nFound feature $featureID in site:"$site.Url"`nRemoving Feature"
-                $site.Features.Remove($featureID, $true)
+                if ($PSCmdlet.ShouldProcess($site.Url, "Remove feature $featureID")) {
+                    $site.Features.Remove($featureID, $true)
+                }
             }
             else {
                 Write-Output "Did not find feature $featureID in site:" $site.Url
@@ -596,6 +603,7 @@ function Remove-SPSMissingFeature {
 }
 
 function Remove-SPSMissingSetupFile {
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
         [Parameter()]
@@ -633,9 +641,11 @@ function Remove-SPSMissingSetupFile {
                 $file = $web.GetFile([GUID]$FileID)
                 if ($null -ne $file.ServerRelativeUrl) {
                     $filelocation = "{0}{1}" -f ($site.WebApplication.Url).TrimEnd("/"), $file.ServerRelativeUrl
-                    Write-Host "Found file location:" $filelocation
+                    Write-Output "Found file location: $filelocation"
                     #Delete the file, the Delete() method bypasses the recycle bin
-                    $file.Delete()
+                    if ($PSCmdlet.ShouldProcess($filelocation, "Delete setup file $FileID")) {
+                        $file.Delete()
+                    }
                     $web.dispose()
                     $site.dispose()
                 }
@@ -657,6 +667,7 @@ function Remove-SPSMissingSetupFile {
 }
 
 function Remove-SPSMissingWebPart {
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
         [Parameter()]
@@ -723,7 +734,9 @@ function Remove-SPSMissingWebPart {
                     $webPartToDelete = $spWebPartManager.WebParts | Where-Object -FilterScript { $_.StorageKey -eq $StorageKey }
                     if ($null -ne $webPartToDelete) {
                         Write-Output "Removing WebPart with StorageKey $StorageKey from page"
-                        $spWebPartManager.DeleteWebPart($spWebPartManager.WebParts[$webPartToDelete.Id])
+                        if ($PSCmdlet.ShouldProcess($pageUrl, "Delete WebPart with StorageKey $StorageKey")) {
+                            $spWebPartManager.DeleteWebPart($spWebPartManager.WebParts[$webPartToDelete.Id])
+                        }
                     }
                     else {
                         Write-Output "WebPart with StorageKey $StorageKey not found on page"
@@ -752,6 +765,7 @@ function Remove-SPSMissingWebPart {
 }
 
 function Remove-SPSMissingAssembly {
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
         [Parameter()]
@@ -800,7 +814,9 @@ function Remove-SPSMissingAssembly {
                     }
                     if ($null -ne $AssemblyToDelete) {
                         Write-Output "Removing AssemblyID $AssemblyID from SPSite object."
-                        $AssemblyToDelete.delete()
+                        if ($PSCmdlet.ShouldProcess("SPSite $SiteID", "Delete AssemblyID $AssemblyID")) {
+                            $AssemblyToDelete.delete()
+                        }
                     }
                     else {
                         Write-Output "AssemblyID $AssemblyID does not exist in SPSite object."
@@ -820,7 +836,9 @@ function Remove-SPSMissingAssembly {
                     }
                     if ($null -ne $AssemblyToDelete) {
                         Write-Output "Removing AssemblyID $AssemblyID from SPWeb object."
-                        $AssemblyToDelete.delete()
+                        if ($PSCmdlet.ShouldProcess("SPWeb $WebID", "Delete AssemblyID $AssemblyID")) {
+                            $AssemblyToDelete.delete()
+                        }
                     }
                     else {
                         Write-Output "AssemblyID $AssemblyID does not exist in SPWeb object."
@@ -842,7 +860,9 @@ function Remove-SPSMissingAssembly {
                         }
                         if ($null -ne $AssemblyToDelete) {
                             Write-Output "Removing AssemblyID $AssemblyID from SPList object."
-                            $AssemblyToDelete.delete()
+                            if ($PSCmdlet.ShouldProcess("SPList $hostID", "Delete AssemblyID $AssemblyID")) {
+                                $AssemblyToDelete.delete()
+                            }
                         }
                         else {
                             Write-Output "AssemblyID $AssemblyID does not exist in SPList object."
@@ -865,6 +885,7 @@ function Remove-SPSMissingAssembly {
 }
 
 function Remove-SPSMissingConfiguration {
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
         [Parameter()]
@@ -899,7 +920,9 @@ function Remove-SPSMissingConfiguration {
                         Write-Output "Removing login: $Login"
                         Write-Output "of SiteAdministrator Property of SPWeb:"
                         Write-Output "$($web.Url)"
-                        $web.SiteAdministrators.Remove($Login)
+                        if ($PSCmdlet.ShouldProcess($web.Url, "Remove SiteAdministrator $Login")) {
+                            $web.SiteAdministrators.Remove($Login)
+                        }
                     }
                     else {
                         Write-Output "$Login does not exist in SiteAdministrators Property"
@@ -922,6 +945,7 @@ function Remove-SPSMissingConfiguration {
 }
 
 function Remove-SPSOrphanedSite {
+    [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
         [Parameter()]
@@ -943,7 +967,9 @@ function Remove-SPSOrphanedSite {
         $spContentDb = Get-SPContentDatabase $Database
         if ($null -ne $spContentDb) {
             Write-Output "Removing SPSite object $SiteID with the method ForceDeleteSite"
-            $spContentDb.ForceDeleteSite($siteID, $false, $false)
+            if ($PSCmdlet.ShouldProcess("SiteID $SiteID in database $Database", 'ForceDeleteSite')) {
+                $spContentDb.ForceDeleteSite($siteID, $false, $false)
+            }
         }
         else {
             Write-Output "SPContentDatabse $Database does not exist.`nPlease check this Database"
