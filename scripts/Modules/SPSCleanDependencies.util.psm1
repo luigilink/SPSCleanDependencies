@@ -1,13 +1,7 @@
-# Ensure the script is running with administrator privileges
-if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
-    Throw "Administrator rights are required. Please re-run this script as an Administrator."
-}
-# Setting power management plan to High Performance"
-Start-Process -FilePath "$env:SystemRoot\system32\powercfg.exe" -ArgumentList '/s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' -NoNewWindow
 function Get-SPSInstalledProductVersion {
     [OutputType([System.Version])]
     param ()
-  
+
     $pathToSearch = 'C:\Program Files\Common Files\microsoft shared\Web Server Extensions\*\ISAPI\Microsoft.SharePoint.dll'
     $fullPath = Get-Item $pathToSearch -ErrorAction SilentlyContinue | Sort-Object { $_.Directory } -Descending | Select-Object -First 1
     if ($null -eq $fullPath) {
@@ -17,25 +11,38 @@ function Get-SPSInstalledProductVersion {
         return (Get-Command $fullPath).FileVersionInfo
     }
 }
-# Load SharePoint Powershell Snapin or Import-Module
-try {
-    $installedVersion = Get-SPSInstalledProductVersion
-    if ($installedVersion.ProductMajorPart -eq 15 -or $installedVersion.ProductBuildPart -le 12999) {
-        if ($null -eq (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue)) {
-            Add-PSSnapin Microsoft.SharePoint.PowerShell
+
+# Import-time prelude (admin check, power plan, SharePoint snap-in load).
+# Skipped when $env:SPSCD_SKIP_PRELUDE is set, so the module can be imported on
+# CI / non-SharePoint hosts (e.g. Pester) without elevation or SharePoint installed.
+if (-not $env:SPSCD_SKIP_PRELUDE) {
+    # Ensure the script is running with administrator privileges
+    if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+        Throw "Administrator rights are required. Please re-run this script as an Administrator."
+    }
+    # Setting power management plan to High Performance"
+    Start-Process -FilePath "$env:SystemRoot\system32\powercfg.exe" -ArgumentList '/s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' -NoNewWindow
+
+    # Load SharePoint Powershell Snapin or Import-Module
+    try {
+        $installedVersion = Get-SPSInstalledProductVersion
+        if ($installedVersion.ProductMajorPart -eq 15 -or $installedVersion.ProductBuildPart -le 12999) {
+            if ($null -eq (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue)) {
+                Add-PSSnapin Microsoft.SharePoint.PowerShell
+            }
+        }
+        else {
+            Import-Module SharePointServer -Verbose:$false -WarningAction SilentlyContinue -DisableNameChecking
         }
     }
-    else {
-        Import-Module SharePointServer -Verbose:$false -WarningAction SilentlyContinue -DisableNameChecking
-    }
-}
-catch {
-    # Handle errors during retrieval of Installed Product Version
-    $catchMessage = @"
+    catch {
+        # Handle errors during retrieval of Installed Product Version
+        $catchMessage = @"
 Failed to get installed Product Version for $($env:COMPUTERNAME)
 Exception: $($_.Exception.Message)
 "@
-    Write-Error -Message $catchMessage
+        Write-Error -Message $catchMessage
+    }
 }
 
 # Initialize jSON Object

@@ -5,6 +5,11 @@ BeforeAll {
     $repoRoot = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
     $script:modulePath = Join-Path -Path $repoRoot -ChildPath 'scripts/Modules/SPSCleanDependencies.util.psm1'
 
+    # Skip the module's import-time prelude (admin check, powercfg, SharePoint snap-in load),
+    # which only makes sense on a real SharePoint farm.
+    $script:previousSkipPrelude = $env:SPSCD_SKIP_PRELUDE
+    $env:SPSCD_SKIP_PRELUDE = '1'
+
     # Stub SharePoint cmdlets so the module can be imported on non-Windows / no-SharePoint hosts.
     # Real behaviour is exercised on a SharePoint farm; these tests only validate shape & contracts.
     $spsStubs = @(
@@ -19,11 +24,14 @@ BeforeAll {
         }
     }
 
-    Import-Module -Name $script:modulePath -Force -DisableNameChecking -ErrorAction SilentlyContinue
+    # Surface real import errors instead of silently hiding them (which previously
+    # produced a cascade of misleading "$null or empty" failures).
+    Import-Module -Name $script:modulePath -Force -DisableNameChecking
 }
 
 AfterAll {
     Remove-Module -Name 'SPSCleanDependencies.util' -Force -ErrorAction SilentlyContinue
+    $env:SPSCD_SKIP_PRELUDE = $script:previousSkipPrelude
 }
 
 Describe 'SPSCleanDependencies.util.psm1 Module' {
