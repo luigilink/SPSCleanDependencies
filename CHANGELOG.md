@@ -3,6 +3,26 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-11
+
+### Added
+
+- SPSCleanDependencies.util.psm1:
+  - Add `Get-SQLMissingWebPartInfo` helper to resolve missing WebPart class IDs to per-page locations (SiteID/WebID/ListID/DirName/LeafName).
+  - Add `Remove-SPSMissingWebPart` cleanup function (uses `GetLimitedWebPartManager` and temporarily clears the site `ReadOnly` flag).
+  - Extend `SPMissingWebPartInfo` class with `ClassName`, `StorageKey`, `SiteID`, `WebID`, `ListID`, `DirName`, `LeafName`.
+
+- SPSCleanDependencies.ps1:
+  - Implement the `MissingWebPart` cleanup branch (previously a no-op).
+  - Implement the `SiteOrphan` cleanup branch by wiring up the existing `Remove-SPSOrphanedSite` function.
+
+- Pester test suite under `tests/`:
+  - `tests/SPSCleanDependencies.Tests.ps1` - script-level tests (metadata, parameters, module imports, Clean branch wiring).
+  - `tests/Modules/SPSCleanDependencies.util.Tests.ps1` - module-level tests (public/SQL function contracts, class shapes, safety net for empty `StorageKey`).
+
+- CI:
+  - `.github/workflows/pester.yml` - runs Pester 5.3+ on `windows-latest` for pull requests to `main`, plus a `PSScriptAnalyzer` code-quality job.
+
 ## [1.1.0] - 2025-10-21
 
 ### Changed

@@ -22,8 +22,8 @@
     .NOTES
     FileName:	SPSCleanDependencies.ps1
     Author:		luigilink (Jean-Cyril DROUHIN)
-    Date:		October 21, 2025
-    Version:	1.1.0
+    Date:		June 11, 2026
+    Version:	1.2.0
 
     .LINK
     https://spjc.fr/
@@ -80,7 +80,7 @@ Exception: $_
 }
 
 # Define variable
-$SPSCleanDependenciesVersion = '1.1.0'
+$SPSCleanDependenciesVersion = '1.2.0'
 $currentUser = ([Security.Principal.WindowsIdentity]::GetCurrent()).Name
 $scriptRootPath = Split-Path -parent $MyInvocation.MyCommand.Definition
 $pathLogsFolder = Join-Path -Path $scriptRootPath -ChildPath 'Logs' -ErrorAction SilentlyContinue
@@ -127,6 +127,15 @@ if ($Clean) {
         }
         if (($jsonEnvCfg.MissingWebPart).Count -ne 0) {
             Write-Output 'Removing Missing WebPart References'
+            foreach ($missingWebPart in $jsonEnvCfg.MissingWebPart) {
+                Remove-SPSMissingWebPart -Database $missingWebPart.Database `
+                    -WebPartID $missingWebPart.WebPartID `
+                    -StorageKey $missingWebPart.StorageKey `
+                    -SiteID $missingWebPart.SiteID `
+                    -WebID $missingWebPart.WebID `
+                    -DirName $missingWebPart.DirName `
+                    -LeafName $missingWebPart.LeafName
+            }
         }
         if (($jsonEnvCfg.MissingSetupFile).Count -ne 0) {
             Write-Output 'Removing Missing SetupFile References'
@@ -146,6 +155,13 @@ if ($Clean) {
                     -WebID $missingAssembly.WebID `
                     -HostType $missingAssembly.HostType `
                     -HostID $missingAssembly.HostID
+            }
+        }
+        if (($jsonEnvCfg.SiteOrphan).Count -ne 0) {
+            Write-Output 'Removing Orphaned Site References'
+            foreach ($orphanedSite in $jsonEnvCfg.SiteOrphan) {
+                Remove-SPSOrphanedSite -Database $orphanedSite.Database `
+                    -SiteID $orphanedSite.SiteID
             }
         }
         if (($jsonEnvCfg.Configuration).Count -ne 0) {

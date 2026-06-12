@@ -69,6 +69,13 @@ class SPMissingWebPartInfo {
     [System.String]$WebPartID
     [System.String]$Message
     [System.String]$Remedy
+    [System.String]$ClassName
+    [System.String]$StorageKey
+    [System.String]$SiteID
+    [System.String]$WebID
+    [System.String]$ListID
+    [System.String]$DirName
+    [System.String]$LeafName
 }
 class SPMissingSetupFileInfo {
     [System.String]$Database
@@ -217,6 +224,64 @@ FROM EventReceivers (NOLOCK) where Assembly = '$($AssemblyInfo)'
     return $tbSQLmissingAssemblies
 }
 
+function Get-SQLMissingWebPartInfo {
+    param
+    (
+        [Parameter()]
+        [System.String]
+        $DatabaseName,
+
+        [Parameter()]
+        [System.String]
+        $DatabaseServer,
+
+        [Parameter()]
+        [System.String]
+        $ClassID
+    )
+
+    class SQLMissingWebPartInfo {
+        [System.String]$StorageKey
+        [System.String]$ClassName
+        [System.String]$SiteID
+        [System.String]$WebID
+        [System.String]$ListID
+        [System.String]$DirName
+        [System.String]$LeafName
+    }
+    $tbSQLmissingWebParts = New-Object -TypeName System.Collections.ArrayList
+    try {
+        $sqlQuery =
+        @"
+USE $($DatabaseName)
+SELECT wp.tp_ID, d.SiteId, d.WebId, d.ListId, d.DirName, d.LeafName, wp.tp_Class
+FROM AllDocs d WITH (NOLOCK)
+INNER JOIN AllWebParts wp WITH (NOLOCK) ON wp.tp_PageUrlID = d.Id
+INNER JOIN AllWebs w WITH (NOLOCK) ON d.WebId = w.id
+WHERE wp.tp_WebPartTypeId = '$($ClassID)'
+"@
+
+        $invokeSQLQueries = Invoke-Sqlcmd -Query $sqlQuery `
+            -ServerInstance "$($DatabaseServer)"
+
+        foreach ($invokeSQLQuery in $invokeSQLQueries) {
+            [void]$tbSQLmissingWebParts.Add([SQLMissingWebPartInfo]@{
+                    StorageKey = $invokeSQLQuery.tp_ID;
+                    ClassName  = $invokeSQLQuery.tp_Class;
+                    SiteID     = $invokeSQLQuery.SiteId;
+                    WebID      = $invokeSQLQuery.WebId;
+                    ListID     = $invokeSQLQuery.ListId;
+                    DirName    = $invokeSQLQuery.DirName;
+                    LeafName   = $invokeSQLQuery.LeafName;
+                })
+        }
+    }
+    catch {
+        return $_
+    }
+    return $tbSQLmissingWebParts
+}
+
 function Get-SQLMissingConfiguration {
     param
     (
@@ -298,13 +363,37 @@ function Get-SPSMissingServerDependencies {
                     if ($null -ne $missingWebParts) {
                         foreach ($missingWebPart in $missingWebParts) {
                             $webPartID = ([regex]::Matches($missingWebPart.Message, '[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}')).value
-                            [void]$tbSPmissingWebParts.Add([SPMissingWebPartInfo]@{
-                                    Database  = "$($spContentDB.Name)";
-                                    Category  = $missingWebPart.Category;
-                                    WebPartID = $webPartID
-                                    Message   = $missingWebPart.Message;
-                                    Remedy    = $missingWebPart.Remedy;
-                                })
+                            $sqlMissingWebParts = Get-SQLMissingWebPartInfo -DatabaseName "$($spContentDB.Name)" `
+                                -DatabaseServer "$($spContentDB.Server)" `
+                                -ClassID "$($webPartID)"
+
+                            if ($null -ne $sqlMissingWebParts -and $sqlMissingWebParts.Count -gt 0) {
+                                foreach ($sqlMissingWebPart in $sqlMissingWebParts) {
+                                    [void]$tbSPmissingWebParts.Add([SPMissingWebPartInfo]@{
+                                            Database   = "$($spContentDB.Name)";
+                                            Category   = $missingWebPart.Category;
+                                            WebPartID  = $webPartID;
+                                            Message    = $missingWebPart.Message;
+                                            Remedy     = $missingWebPart.Remedy;
+                                            ClassName  = $sqlMissingWebPart.ClassName;
+                                            StorageKey = $sqlMissingWebPart.StorageKey;
+                                            SiteID     = $sqlMissingWebPart.SiteID;
+                                            WebID      = $sqlMissingWebPart.WebID;
+                                            ListID     = $sqlMissingWebPart.ListID;
+                                            DirName    = $sqlMissingWebPart.DirName;
+                                            LeafName   = $sqlMissingWebPart.LeafName;
+                                        })
+                                }
+                            }
+                            else {
+                                [void]$tbSPmissingWebParts.Add([SPMissingWebPartInfo]@{
+                                        Database  = "$($spContentDB.Name)";
+                                        Category  = $missingWebPart.Category;
+                                        WebPartID = $webPartID;
+                                        Message   = $missingWebPart.Message;
+                                        Remedy    = $missingWebPart.Remedy;
+                                    })
+                            }
                         }
                     }
                     if ($null -ne $missingSetupFiles) {
@@ -553,6 +642,101 @@ function Remove-SPSMissingSetupFile {
         }
         else {
             Write-Output "SiteID $SiteID does not exist.`nPlease check this siteID"
+        }
+    }
+    catch {
+        return $_
+    }
+}
+
+function Remove-SPSMissingWebPart {
+    param
+    (
+        [Parameter()]
+        [System.String]
+        $Database,
+
+        [Parameter()]
+        [System.String]
+        $WebPartID,
+
+        [Parameter()]
+        [System.String]
+        $StorageKey,
+
+        [Parameter()]
+        [System.String]
+        $SiteID,
+
+        [Parameter()]
+        [System.String]
+        $WebID,
+
+        [Parameter()]
+        [System.String]
+        $DirName,
+
+        [Parameter()]
+        [System.String]
+        $LeafName
+    )
+
+    try {
+        Write-Output '-----------------------------------------------'
+        Write-Output 'Removing Missing WebPart Dependencies of:'
+        Write-Output " * Database: $Database"
+        Write-Output " * WebPartID (class): $WebPartID"
+        Write-Output " * StorageKey: $StorageKey"
+        Write-Output " * SiteID: $SiteID"
+        Write-Output " * WebID: $WebID"
+        Write-Output " * Page: $DirName/$LeafName"
+        Write-Output '-----------------------------------------------'
+
+        if ([string]::IsNullOrEmpty($StorageKey)) {
+            Write-Output 'StorageKey is empty - no specific WebPart instance to remove. Re-run the audit to collect per-page locations.'
+            return
+        }
+
+        $site = Get-SPSite -Limit All -Identity $SiteID -ErrorAction SilentlyContinue
+        if ($null -ne $site) {
+            $isSiteReadOnly = $site.ReadOnly
+            $web = Get-SPWeb -Identity $WebID -Site $site -Limit ALL -ErrorAction SilentlyContinue
+            if ($null -ne $web) {
+                $webAppUrl = ($site.WebApplication.Url).TrimEnd('/')
+                $pageUrl = "{0}/{1}/{2}" -f $webAppUrl, $DirName, $LeafName
+                Write-Output "Page URL: $pageUrl"
+
+                if ($isSiteReadOnly) {
+                    Write-Output 'ReadOnly flag temporarily removed from site'
+                    $site.ReadOnly = $false
+                }
+
+                try {
+                    $spWebPartManager = $web.GetLimitedWebPartManager($pageUrl, [System.Web.UI.WebControls.WebParts.PersonalizationScope]::Shared)
+                    $webPartToDelete = $spWebPartManager.WebParts | Where-Object -FilterScript { $_.StorageKey -eq $StorageKey }
+                    if ($null -ne $webPartToDelete) {
+                        Write-Output "Removing WebPart with StorageKey $StorageKey from page"
+                        $spWebPartManager.DeleteWebPart($spWebPartManager.WebParts[$webPartToDelete.Id])
+                    }
+                    else {
+                        Write-Output "WebPart with StorageKey $StorageKey not found on page"
+                    }
+                }
+                finally {
+                    if ($isSiteReadOnly) {
+                        Write-Output 'ReadOnly flag re-applied to site'
+                        $site.ReadOnly = $true
+                    }
+                    $web.Dispose()
+                }
+            }
+            else {
+                Write-Output "WebID $WebID does not exist.`nPlease check this WebID"
+            }
+            $site.Dispose()
+        }
+        else {
+            Write-Output "SiteID $SiteID does not exist.`nPlease check this SiteID"
         }
     }
     catch {
