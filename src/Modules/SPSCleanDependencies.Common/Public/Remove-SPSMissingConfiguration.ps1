@@ -25,7 +25,7 @@ function Remove-SPSMissingConfiguration {
 
         $site = Get-SPSite -limit all -Identity $siteID
         if ($null -ne $site) {
-            Write-Output "Checking SPSite:" $site.Url
+            Write-Output "Checking SPSite: $($site.Url)"
             $webs = Get-SPWeb -Site $siteID -Limit ALL
             if ($null -ne $webs) {
                 foreach ($web in $webs) {

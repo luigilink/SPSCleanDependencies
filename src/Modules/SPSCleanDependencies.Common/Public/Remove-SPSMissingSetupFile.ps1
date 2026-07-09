@@ -30,7 +30,7 @@ function Remove-SPSMissingSetupFile {
         #Display site information
         $site = Get-SPSite $SiteID -ErrorAction SilentlyContinue
         if ($null -ne $site) {
-            Write-Output "Checking SPSite:" $site.Url
+            Write-Output "Checking SPSite: $($site.Url)"
             $web = Get-SPWeb -Identity $WebID -Site $siteID -Limit ALL
             if ($null -ne $web) {
                 Write-Output "Checking SPWeb Object ID: $WebID"

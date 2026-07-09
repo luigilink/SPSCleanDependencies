@@ -25,28 +25,28 @@ function Remove-SPSMissingFeature {
         #Display site information
         $site = Get-SPSite $SiteID -ErrorAction SilentlyContinue
         if ($null -ne $site) {
-            Write-Output "Checking SPSite:" $site.Url
+            Write-Output "Checking SPSite: $($site.Url)"
             #Remove the feature from all subsites
             ForEach ($web in $Site.AllWebs) {
                 if ($web.Features[$featureID]) {
-                    Write-Output "`nFound Feature $featureID in web:"$Web.Url"`nRemoving feature"
+                    Write-Output "`nFound Feature $featureID in web: $($Web.Url)`nRemoving feature"
                     if ($PSCmdlet.ShouldProcess($Web.Url, "Remove feature $featureID")) {
                         $web.Features.Remove($featureID, $true)
                     }
                 }
                 else {
-                    Write-Output "`nDid not find feature $featureID in web:" $Web.Url
+                    Write-Output "`nDid not find feature $featureID in web: $($Web.Url)"
                 }
             }
             #Remove the feature from the site collection
             if ($Site.Features[$featureID]) {
-                Write-Output "`nFound feature $featureID in site:"$site.Url"`nRemoving Feature"
+                Write-Output "`nFound feature $featureID in site: $($site.Url)`nRemoving Feature"
                 if ($PSCmdlet.ShouldProcess($site.Url, "Remove feature $featureID")) {
                     $site.Features.Remove($featureID, $true)
                 }
             }
             else {
-                Write-Output "Did not find feature $featureID in site:" $site.Url
+                Write-Output "Did not find feature $featureID in site: $($site.Url)"
             }
         }
         else {
