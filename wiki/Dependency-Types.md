@@ -94,4 +94,5 @@ In audit mode the results file (`Results\<FileName>.json`) is a single object wh
 ## See also
 
 - [Usage](Usage)
+- [Reports & History](Reports-and-History)
 - [Troubleshooting](Troubleshooting)

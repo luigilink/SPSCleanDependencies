@@ -4,6 +4,7 @@
 - [🚀 Getting Started](Getting-Started)
 - [📖 Usage](Usage)
 - [🧩 Dependency Types](Dependency-Types)
+- [📊 Reports & History](Reports-and-History)
 - [🛠️ Troubleshooting](Troubleshooting)
 - [📦 Release Process](Release-Process)
 
