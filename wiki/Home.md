@@ -22,3 +22,6 @@ For details on usage, configuration, and parameters, explore the links below:
 
 - [Getting Started](./Getting-Started)
 - [Usage](./Usage)
+- [Dependency Types](./Dependency-Types)
+- [Troubleshooting](./Troubleshooting)
+- [Release Process](./Release-Process)
