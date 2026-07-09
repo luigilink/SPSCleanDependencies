@@ -3,6 +3,21 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-09
+
+### Added
+
+- Results history:
+  - New `Backup-SPSJsonFile` public function archives the current `Results\<FileName>.json` into `Results\history\` with a `yyyyMMdd-HHmm` timestamp before each audit overwrites it (pattern reused from SPSUserSync / SPSWeather).
+  - New `Clear-SPSLogFolder` public function — a single retention/rotation implementation reused for both the transcript logs (`*.log`) and the archived snapshots (`*.json`). `Retention = 0` disables pruning.
+- HTML report:
+  - New `Export-SPSCleanDependenciesReport` public function renders the results JSON as a self-contained, dependency-free HTML report — one summary card per dependency category plus a filterable/sortable table per non-empty category, or a clean "nothing to clean" state. Uses an atomic write (temp file + `Move-Item`).
+  - New internal helpers (Private, not exported): `ConvertTo-SPSHtmlEncoded`, `Get-SPSReportHtmlHead`, `Get-SPSReportCardHtml`, `Get-SPSReportHtmlScript` (pattern reused from SPSUpdate.Common).
+- `SPSCleanDependencies.ps1`:
+  - The audit run now archives the previous results, generates `Results\<FileName>.html`, and prunes old history/logs. The current `Results\<FileName>.json` stays stable (still the exact input consumed by `-Clean`); only the history copies are timestamped.
+  - New `-HistoryRetentionDays` (default 30) and `-LogRetentionDays` (default 180) parameters control retention; `0` disables pruning. [issue #8](https://github.com/luigilink/SPSCleanDependencies/issues/8)
+- Pester coverage for the new functions and the audit-branch wiring.
+
 ## [1.3.0] - 2026-07-09
 
 ### Changed

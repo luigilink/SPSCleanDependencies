@@ -17,6 +17,9 @@ SPSCleanDependencies is a PowerShell script tool to clean Missing Server Depende
 - Logging:
   - Creates a log file in the Logs folder with a timestamped filename.
   - Outputs script metadata, including version, start time, and PowerShell version.
+- Results history & report:
+  - Archives the previous `Results\<FileName>.json` into `Results\history\` (timestamped) before each audit, with configurable retention.
+  - Generates a self-contained `Results\<FileName>.html` report summarising the missing dependencies per category.
 
 For details on usage, configuration, and parameters, explore the links below:
 

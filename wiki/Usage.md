@@ -6,6 +6,8 @@
 | ----------- | -------------------------------------------------- |
 | `FileName` | Specifies the name of the configuration json file. |
 | `Clean`    | Remove missing server side dependencies            |
+| `HistoryRetentionDays` | Days of archived result snapshots to keep in `Results\history` (default 30; `0` disables pruning). |
+| `LogRetentionDays` | Days of transcript logs to keep in `Logs` (default 180; `0` disables pruning). |
 
 ### Basic Usage Example
 
@@ -28,5 +30,6 @@ Remove missing server side dependencies on SharePoint farm:
 
 ## Next Steps
 
+- [Reports & History](./Reports-and-History) — the generated HTML report and the timestamped results history.
 - [Dependency Types](./Dependency-Types) — the categories detected and cleaned, and the results JSON shape.
 - [Troubleshooting](./Troubleshooting) — common issues and how to resolve them.

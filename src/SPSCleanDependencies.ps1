@@ -16,6 +16,15 @@
     .PARAMETER Clean
     Use the switch Clean parameter if you want to clean up Missing server side dependencies
 
+    .PARAMETER HistoryRetentionDays
+    Number of days of archived result snapshots to keep in the Results\history folder.
+    Before each audit the current Results\<FileName>.json is copied there with a
+    timestamp; snapshots older than this are pruned. Defaults to 30. Set to 0 to disable pruning.
+
+    .PARAMETER LogRetentionDays
+    Number of days of transcript log files to keep in the Logs folder. Defaults to 180.
+    Set to 0 to disable pruning.
+
     .EXAMPLE
     SPSCleanDependencies.ps1 -FileName 'CONTOSO-PROD-SP2019'
     This command will create a JSON file in the Results folder with the name CONTOSO-PROD-SP2019.json
@@ -38,7 +47,15 @@ param(
 
     [Parameter(Position = 2)]
     [switch]
-    $Clean
+    $Clean,
+
+    [Parameter()]
+    [System.UInt32]
+    $HistoryRetentionDays = 30,
+
+    [Parameter()]
+    [System.UInt32]
+    $LogRetentionDays = 180
 )
 
 #requires -Version 5.1
@@ -125,6 +142,8 @@ if (-not(Test-Path $pathResultsFolder)) {
 }
 $pathLogFile = Join-Path -Path $pathLogsFolder -ChildPath "$($FileName)_$([datetime]::Now.ToString('yyyyMMddHHmmss')).log"
 $pathJsonFile = Join-Path -Path $pathResultsFolder -ChildPath ("$($FileName).json")
+$pathHtmlFile = Join-Path -Path $pathResultsFolder -ChildPath ("$($FileName).html")
+$pathHistoryFolder = Join-Path -Path $pathResultsFolder -ChildPath 'history'
 $DateStarted = Get-date
 $psVersion = ($host).Version.ToString()
 
@@ -220,7 +239,25 @@ if ($Clean) {
 }
 else {
     Write-Output 'Getting Missing Server Side Dependencies'
+
+    # Archive the previous results snapshot (if any) before it is overwritten,
+    # so a history of past audits is kept under Results\history.
+    [void](Backup-SPSJsonFile -Path $pathJsonFile -HistoryFolder $pathHistoryFolder)
+
     Get-SPSMissingServerDependencies -Path $pathJsonFile
+
+    # Generate a self-contained HTML report from the fresh results.
+    if (Test-Path $pathJsonFile) {
+        Write-Output "Generating HTML report: $pathHtmlFile"
+        [void](Export-SPSCleanDependenciesReport -InputFile $pathJsonFile `
+                -OutputFile $pathHtmlFile `
+                -FarmName $FileName `
+                -Version $SPSCleanDependenciesVersion)
+    }
+
+    # Prune old history snapshots and transcript logs.
+    Clear-SPSLogFolder -Path $pathHistoryFolder -Retention $HistoryRetentionDays -Extension '*.json'
+    Clear-SPSLogFolder -Path $pathLogsFolder -Retention $LogRetentionDays -Extension '*.log'
 }
 #endregion
 
