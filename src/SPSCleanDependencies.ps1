@@ -1,9 +1,11 @@
-﻿<#
+<#
     .SYNOPSIS
     SPSCleanDependencies script for SharePoint Server
 
     .DESCRIPTION
-    SPSCleanDependencies is a PowerShell script tool to clean Missing Server Dependencies in your SharePoint Farm
+    SPSCleanDependencies is a PowerShell script tool to clean Missing Server Dependencies in your SharePoint Farm.
+    Shared logic lives in the SPSCleanDependencies.Common module (src/Modules/SPSCleanDependencies.Common);
+    the script version is sourced from that module's manifest (ModuleVersion).
 
     .PARAMETER FileName
     Specify the name of the file to be used for the script.
@@ -22,8 +24,8 @@
     .NOTES
     FileName:	SPSCleanDependencies.ps1
     Author:		luigilink (Jean-Cyril DROUHIN)
-    Date:		June 11, 2026
-    Version:	1.2.0
+    Date:		July 9, 2026
+    Version:	Defined by the SPSCleanDependencies.Common module manifest (ModuleVersion)
 
     .LINK
     https://spjc.fr/
@@ -48,19 +50,45 @@ Clear-Host
 # Set the window title
 $Host.UI.RawUI.WindowTitle = "SPSCleanDependencies script running on $env:COMPUTERNAME"
 
-# Define the path to the helper module
-$scriptRootPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$script:HelperModulePath = Join-Path -Path $scriptRootPath -ChildPath 'Modules'
-
-# Import the helper module
+# Import the helper module (SPSCleanDependencies.Common)
+$script:HelperModulePath = Join-Path -Path $PSScriptRoot -ChildPath 'Modules'
 try {
-    Import-Module -Name (Join-Path -Path $script:HelperModulePath -ChildPath 'SPSCleanDependencies.util.psm1') -Force -DisableNameChecking
+    Import-Module -Name (Join-Path -Path $script:HelperModulePath -ChildPath 'SPSCleanDependencies.Common\SPSCleanDependencies.Common.psd1') -Force -ErrorAction Stop
 }
 catch {
     # Handle errors during Import of helper module
     Write-Error -Message @"
-Failed to import helper module from path: $($script:HelperModulePath)
+Failed to import SPSCleanDependencies.Common module from path: $($script:HelperModulePath)
 Exception: $_
+"@
+    Exit
+}
+
+# Ensure the script is running with administrator privileges
+if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+    Throw "Administrator rights are required. Please re-run this script as an Administrator."
+}
+
+# Setting power management plan to High Performance
+Start-Process -FilePath "$env:SystemRoot\system32\powercfg.exe" -ArgumentList '/s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' -NoNewWindow
+
+# Load SharePoint PowerShell Snap-in or Import-Module
+try {
+    $installedVersion = Get-SPSInstalledProductVersion
+    if ($installedVersion.ProductMajorPart -eq 15 -or $installedVersion.ProductBuildPart -le 12999) {
+        if ($null -eq (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue)) {
+            Add-PSSnapin Microsoft.SharePoint.PowerShell
+        }
+    }
+    else {
+        Import-Module SharePointServer -Verbose:$false -WarningAction SilentlyContinue -DisableNameChecking
+    }
+}
+catch {
+    # Handle errors during retrieval of Installed Product Version
+    Write-Error -Message @"
+Failed to get installed Product Version for $($env:COMPUTERNAME)
+Exception: $($_.Exception.Message)
 "@
     Exit
 }
@@ -80,9 +108,9 @@ Exception: $_
 }
 
 # Define variable
-$SPSCleanDependenciesVersion = '1.2.0'
+$SPSCleanDependenciesVersion = (Get-Module -Name 'SPSCleanDependencies.Common').Version.ToString()
 $currentUser = ([Security.Principal.WindowsIdentity]::GetCurrent()).Name
-$scriptRootPath = Split-Path -parent $MyInvocation.MyCommand.Definition
+$scriptRootPath = $PSScriptRoot
 $pathLogsFolder = Join-Path -Path $scriptRootPath -ChildPath 'Logs' -ErrorAction SilentlyContinue
 $pathResultsFolder = Join-Path -Path $scriptRootPath -ChildPath 'Results' -ErrorAction SilentlyContinue
 
@@ -206,6 +234,6 @@ Write-Output "| Ended on    - $DateEnded"
 Write-Output '-----------------------------------------------'
 Stop-Transcript
 Remove-Variable * -ErrorAction SilentlyContinue
-Remove-Module * -ErrorAction SilentlyContinue
+Remove-Module -Name 'SPSCleanDependencies.Common' -ErrorAction SilentlyContinue
 $error.Clear()
 Exit
