@@ -1,6 +1,6 @@
 @{
     RootModule        = 'SPSCleanDependencies.Common.psm1'
-    ModuleVersion     = '1.3.0'
+    ModuleVersion     = '1.4.0'
     GUID              = 'aa259ca2-c421-487d-80ec-b7d7b440c584'
     Author            = 'Jean-Cyril DROUHIN'
     CompanyName       = 'luigilink'
@@ -10,6 +10,9 @@
     PowerShellVersion = '5.1'
 
     FunctionsToExport = @(
+        'Backup-SPSJsonFile'
+        'Clear-SPSLogFolder'
+        'Export-SPSCleanDependenciesReport'
         'Get-SPSInstalledProductVersion'
         'Get-SPSMissingServerDependencies'
         'Remove-SPSMissingAssembly'
