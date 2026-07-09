@@ -3,7 +3,7 @@
 
 BeforeAll {
     $repoRoot = Split-Path -Path $PSScriptRoot -Parent
-    $script:scriptPath = Join-Path -Path $repoRoot -ChildPath 'scripts/SPSCleanDependencies.ps1'
+    $script:scriptPath = Join-Path -Path $repoRoot -ChildPath 'src/SPSCleanDependencies.ps1'
     $script:scriptContent = Get-Content -Path $script:scriptPath -Raw -ErrorAction SilentlyContinue
 }
 
@@ -44,8 +44,8 @@ Describe 'SPSCleanDependencies.ps1 Metadata' {
         $script:scriptContent | Should -Match 'Author:\s*luigilink'
     }
 
-    It 'Should declare a Version in NOTES' {
-        $script:scriptContent | Should -Match 'Version:\s*\d+\.\d+\.\d+'
+    It 'Should source its Version from the SPSCleanDependencies.Common manifest' {
+        $script:scriptContent | Should -Match 'Version:\s*Defined by the SPSCleanDependencies\.Common module manifest'
     }
 
     It 'Should require PowerShell 5.1 or higher' {
@@ -109,8 +109,12 @@ Describe 'SPSCleanDependencies.ps1 Parameters' {
 
 Describe 'SPSCleanDependencies.ps1 Module Imports' {
 
-    It 'Should import the helper module SPSCleanDependencies.util.psm1' {
-        $script:scriptContent | Should -Match 'Import-Module[^\n]*SPSCleanDependencies\.util\.psm1'
+    It 'Should import the SPSCleanDependencies.Common module via its manifest' {
+        $script:scriptContent | Should -Match 'Import-Module[^\n]*SPSCleanDependencies\.Common\.psd1'
+    }
+
+    It 'Should source the script version from the module manifest' {
+        $script:scriptContent | Should -Match "Get-Module\s+-Name\s+'SPSCleanDependencies\.Common'\)\.Version"
     }
 
     It 'Should import the SqlServer module' {
