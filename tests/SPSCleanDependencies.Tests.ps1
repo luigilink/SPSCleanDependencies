@@ -102,8 +102,14 @@ Describe 'SPSCleanDependencies.ps1 Parameters' {
         $typeAttr.TypeName.FullName | Should -Be 'switch'
     }
 
-    It 'Should have exactly two parameters' {
-        $script:paramBlock.Parameters.Count | Should -Be 2
+    It 'Should expose the HistoryRetentionDays and LogRetentionDays parameters' {
+        $names = $script:paramBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath }
+        $names | Should -Contain 'HistoryRetentionDays'
+        $names | Should -Contain 'LogRetentionDays'
+    }
+
+    It 'Should have exactly four parameters' {
+        $script:paramBlock.Parameters.Count | Should -Be 4
     }
 }
 
@@ -178,5 +184,25 @@ Describe 'SPSCleanDependencies.ps1 Clean Branch' {
 
     It 'Should throw when the JSON results file is missing' {
         $script:scriptContent | Should -Match 'Throw\s+"Missing\s+\$pathJsonFile'
+    }
+}
+Describe 'SPSCleanDependencies.ps1 Audit Branch (history + report)' {
+
+    It 'Should archive the previous results with Backup-SPSJsonFile before the audit' {
+        $script:scriptContent | Should -Match 'Backup-SPSJsonFile\s+-Path\s+\$pathJsonFile'
+    }
+
+    It 'Should generate the HTML report with Export-SPSCleanDependenciesReport' {
+        $script:scriptContent | Should -Match 'Export-SPSCleanDependenciesReport\s+-InputFile\s+\$pathJsonFile'
+    }
+
+    It 'Should prune the history folder and the logs folder with Clear-SPSLogFolder' {
+        $script:scriptContent | Should -Match 'Clear-SPSLogFolder\s+-Path\s+\$pathHistoryFolder'
+        $script:scriptContent | Should -Match 'Clear-SPSLogFolder\s+-Path\s+\$pathLogsFolder'
+    }
+
+    It 'Should derive the html file and history folder paths' {
+        $script:scriptContent | Should -Match '\$pathHtmlFile\s*='
+        $script:scriptContent | Should -Match '\$pathHistoryFolder\s*='
     }
 }
