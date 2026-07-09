@@ -25,3 +25,8 @@ Remove missing server side dependencies on SharePoint farm:
 ```powershell
 .\SPSCleanDependencies.ps1 -FileName 'CONTOSO-PROD-SPSE' -Clean
 ```
+
+## Next Steps
+
+- [Dependency Types](./Dependency-Types) — the categories detected and cleaned, and the results JSON shape.
+- [Troubleshooting](./Troubleshooting) — common issues and how to resolve them.

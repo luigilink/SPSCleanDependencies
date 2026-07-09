@@ -1,14 +1,13 @@
-# Pester tests for SPSCleanDependencies.util.psm1
-# Resolve repo root - works on both local and CI/CD
+# Pester tests for the SPSCleanDependencies.Common module.
+# Resolve repo root - works on both local and CI/CD.
 
 BeforeAll {
     $repoRoot = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
-    $script:modulePath = Join-Path -Path $repoRoot -ChildPath 'scripts/Modules/SPSCleanDependencies.util.psm1'
-
-    # Skip the module's import-time prelude (admin check, powercfg, SharePoint snap-in load),
-    # which only makes sense on a real SharePoint farm.
-    $script:previousSkipPrelude = $env:SPSCD_SKIP_PRELUDE
-    $env:SPSCD_SKIP_PRELUDE = '1'
+    $script:moduleRoot = Join-Path -Path $repoRoot -ChildPath 'src/Modules/SPSCleanDependencies.Common'
+    $script:moduleManifest = Join-Path -Path $script:moduleRoot -ChildPath 'SPSCleanDependencies.Common.psd1'
+    $script:moduleFile = Join-Path -Path $script:moduleRoot -ChildPath 'SPSCleanDependencies.Common.psm1'
+    $script:moduleName = 'SPSCleanDependencies.Common'
+    $script:dependenciesFunctionFile = Join-Path -Path $script:moduleRoot -ChildPath 'Public/Get-SPSMissingServerDependencies.ps1'
 
     # Stub SharePoint cmdlets so the module can be imported on non-Windows / no-SharePoint hosts.
     # Real behaviour is exercised on a SharePoint farm; these tests only validate shape & contracts.
@@ -24,38 +23,46 @@ BeforeAll {
         }
     }
 
-    # Surface real import errors instead of silently hiding them (which previously
-    # produced a cascade of misleading "$null or empty" failures).
-    Import-Module -Name $script:modulePath -Force -DisableNameChecking
+    # The module is import-safe by design (the admin/powercfg/snap-in prelude now lives in the
+    # entry script, not the module). Surface real import errors instead of hiding them.
+    Import-Module -Name $script:moduleManifest -Force -DisableNameChecking
 }
 
 AfterAll {
-    Remove-Module -Name 'SPSCleanDependencies.util' -Force -ErrorAction SilentlyContinue
-    $env:SPSCD_SKIP_PRELUDE = $script:previousSkipPrelude
+    Remove-Module -Name 'SPSCleanDependencies.Common' -Force -ErrorAction SilentlyContinue
 }
 
-Describe 'SPSCleanDependencies.util.psm1 Module' {
+Describe 'SPSCleanDependencies.Common Module' {
 
-    It 'module file exists' {
-        $script:modulePath | Should -Exist
+    It 'module manifest exists' {
+        $script:moduleManifest | Should -Exist
     }
 
-    It 'has valid PowerShell syntax' {
+    It 'loader module file exists' {
+        $script:moduleFile | Should -Exist
+    }
+
+    It 'loader has valid PowerShell syntax' {
         $parseErrors = $null
         $tokens = $null
         $null = [System.Management.Automation.Language.Parser]::ParseInput(
-            (Get-Content -Path $script:modulePath -Raw), [ref]$tokens, [ref]$parseErrors)
+            (Get-Content -Path $script:moduleFile -Raw), [ref]$tokens, [ref]$parseErrors)
         $parseErrors | Should -BeNullOrEmpty
     }
 
+    It 'manifest declares a ModuleVersion' {
+        (Test-ModuleManifest -Path $script:moduleManifest).Version | Should -Not -BeNullOrEmpty
+    }
+
     It 'module loads successfully' {
-        Get-Module -Name 'SPSCleanDependencies.util' | Should -Not -BeNullOrEmpty
+        Get-Module -Name $script:moduleName | Should -Not -BeNullOrEmpty
     }
 }
 
-Describe 'SPSCleanDependencies.util.psm1 Public Functions' {
+Describe 'SPSCleanDependencies.Common Public Functions' {
 
     $publicFunctions = @(
+        'Get-SPSInstalledProductVersion',
         'Get-SPSMissingServerDependencies',
         'Remove-SPSMissingFeature',
         'Remove-SPSMissingSetupFile',
@@ -68,9 +75,24 @@ Describe 'SPSCleanDependencies.util.psm1 Public Functions' {
     It 'exports <_>' -ForEach $publicFunctions {
         Get-Command -Name $_ -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
     }
+
+    It 'manifest FunctionsToExport matches the exported set' {
+        $expectedExports = @(
+            'Get-SPSInstalledProductVersion',
+            'Get-SPSMissingServerDependencies',
+            'Remove-SPSMissingFeature',
+            'Remove-SPSMissingSetupFile',
+            'Remove-SPSMissingAssembly',
+            'Remove-SPSMissingConfiguration',
+            'Remove-SPSMissingWebPart',
+            'Remove-SPSOrphanedSite'
+        ) | Sort-Object
+        $exported = (Get-Module -Name $script:moduleName).ExportedFunctions.Keys | Sort-Object
+        $exported | Should -Be $expectedExports
+    }
 }
 
-Describe 'SPSCleanDependencies.util.psm1 SQL Helper Functions' {
+Describe 'SPSCleanDependencies.Common Private SQL Helpers' {
 
     $sqlHelpers = @(
         'Get-SQLMissingSetupFileInfo',
@@ -79,12 +101,20 @@ Describe 'SPSCleanDependencies.util.psm1 SQL Helper Functions' {
         'Get-SQLMissingConfiguration'
     )
 
-    It 'defines helper <_>' -ForEach $sqlHelpers {
-        Get-Command -Name $_ -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+    It 'defines internal helper <_> (module scope)' -ForEach $sqlHelpers {
+        $helper = $_
+        InModuleScope -ModuleName 'SPSCleanDependencies.Common' -Parameters @{ helper = $helper } {
+            param($helper)
+            Get-Command -Name $helper -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    It 'does not export the SQL helpers to callers <_>' -ForEach $sqlHelpers {
+        (Get-Module -Name $script:moduleName).ExportedFunctions.Keys | Should -Not -Contain $_
     }
 }
 
-Describe 'SPSCleanDependencies.util.psm1 Function Parameter Contracts' {
+Describe 'SPSCleanDependencies.Common Function Parameter Contracts' {
 
     It 'Get-SPSMissingServerDependencies has a Path parameter' {
         (Get-Command Get-SPSMissingServerDependencies).Parameters.Keys | Should -Contain 'Path'
@@ -154,7 +184,7 @@ Describe 'Remove-SPSMissingWebPart Safety Net' {
     }
 }
 
-Describe 'SPSCleanDependencies.util.psm1 ShouldProcess Support' {
+Describe 'SPSCleanDependencies.Common ShouldProcess Support' {
 
     $stateChangingFunctions = @(
         'Remove-SPSMissingFeature',
@@ -173,10 +203,10 @@ Describe 'SPSCleanDependencies.util.psm1 ShouldProcess Support' {
     }
 }
 
-Describe 'SPSCleanDependencies.util.psm1 Class Definitions' {
+Describe 'SPSCleanDependencies.Common Class Definitions' {
 
     BeforeAll {
-        $script:moduleContent = Get-Content -Path $script:modulePath -Raw
+        $script:functionContent = Get-Content -Path $script:dependenciesFunctionFile -Raw
     }
 
     $expectedClasses = @(
@@ -189,11 +219,11 @@ Describe 'SPSCleanDependencies.util.psm1 Class Definitions' {
         'SPMissingOrphanedSites'
     )
 
-    It 'defines class <_>' -ForEach $expectedClasses {
-        $script:moduleContent | Should -Match "class\s+$_\b"
+    It 'defines class <_> in Get-SPSMissingServerDependencies.ps1' -ForEach $expectedClasses {
+        $script:functionContent | Should -Match "class\s+$_\b"
     }
 
     It 'SPMissingWebPartInfo class carries per-page location fields' {
-        $script:moduleContent | Should -Match 'class\s+SPMissingWebPartInfo[\s\S]*\$StorageKey[\s\S]*\$DirName[\s\S]*\$LeafName'
+        $script:functionContent | Should -Match 'class\s+SPMissingWebPartInfo[\s\S]*\$StorageKey[\s\S]*\$DirName[\s\S]*\$LeafName'
     }
 }

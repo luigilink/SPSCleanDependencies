@@ -7,8 +7,17 @@ on:
     branches:
       - main
     paths:
-      - 'scripts/**'
+      - 'src/**'
       - 'tests/**'
+      - 'PSScriptAnalyzerSettings.psd1'
+
+# The "Publish Test Results" step creates a check run, which requires write
+# access to checks. The default GITHUB_TOKEN is read-only on repositories
+# created with the modern default, so grant the minimum needed here.
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
 
 jobs:
   test:
@@ -17,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Pester
         shell: pwsh
@@ -38,7 +47,7 @@ jobs:
           Invoke-Pester -Configuration $config
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: test-results
@@ -47,6 +56,7 @@ jobs:
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action/composite@v2
         if: always()
+        continue-on-error: true
         with:
           files: |
             test-results.xml
@@ -58,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
@@ -68,16 +78,16 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $scriptFiles = Get-ChildItem -Path ./scripts -Include '*.ps1', '*.psm1' -Recurse
-
-          $results = $scriptFiles | ForEach-Object {
-            Invoke-ScriptAnalyzer -Path $_.FullName -Severity Error,Warning -Settings ./PSScriptAnalyzerSettings.psd1
-          }
+          # Analyze our own code only: the entry script and the SPSCleanDependencies.Common module.
+          $results = @()
+          $results += Invoke-ScriptAnalyzer -Path ./src/SPSCleanDependencies.ps1 -Settings ./PSScriptAnalyzerSettings.psd1
+          $results += Invoke-ScriptAnalyzer -Path ./src/Modules/SPSCleanDependencies.Common -Recurse -Settings ./PSScriptAnalyzerSettings.psd1
 
           if ($results) {
             $results | Format-Table -AutoSize
             Write-Error "PSScriptAnalyzer found issues"
             exit 1
-          } else {
+          }
+          else {
             Write-Host "No issues found by PSScriptAnalyzer"
           }
