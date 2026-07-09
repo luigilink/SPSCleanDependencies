@@ -3,6 +3,31 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-09
+
+### Changed
+
+- Restructure the helper module into `src/Modules/SPSCleanDependencies.Common` following the `SPSUpdate` pattern:
+  - One function per file under `Public/` (`Get-SPSInstalledProductVersion`, `Get-SPSMissingServerDependencies` and the six `Remove-SPS*` cleanups) and the internal SQL helpers under `Private/` (`Get-SQLMissing*`, no longer exported to callers).
+  - Add a loader `SPSCleanDependencies.Common.psm1` that dot-sources `Private/` + `Public/` and exports only the public functions.
+  - Add a clean `SPSCleanDependencies.Common.psd1` manifest (`ModuleVersion` `1.3.0`, correct `FunctionsToExport`) replacing the mis-named, never-imported `SPSCleanDependencies.util.util.psd1`.
+  - Fold the former module-level classes, `ArrayList` collections and `jsonObject` into `Get-SPSMissingServerDependencies` (their only consumer) so the module holds no mutable state.
+- Move the entry script to `src/SPSCleanDependencies.ps1` and import the module through its manifest. The script version is now sourced from `(Get-Module SPSCleanDependencies.Common).Version` instead of a hard-coded string.
+- Relocate the import-time prelude (administrator check, High Performance power plan and SharePoint snap-in / `SharePointServer` module load) from the module into the entry script, making the module import-safe by design (the `SPSCD_SKIP_PRELUDE` gate is no longer needed).
+- Behaviour on a real SharePoint farm is unchanged. [issue #6](https://github.com/luigilink/SPSCleanDependencies/issues/6)
+
+- Tests:
+  - Rename the module test file to `tests/Modules/SPSCleanDependencies.Common.Tests.ps1` and adapt it to the new layout (import via the `.psd1` manifest, resolve the internal SQL helpers through `InModuleScope`, assert `FunctionsToExport` matches the exported set, match the `SPMissing*` classes against `Public/Get-SPSMissingServerDependencies.ps1`).
+  - Point the entry-script tests at `src/SPSCleanDependencies.ps1` and assert the manifest-based import and version sourcing.
+
+- CI:
+  - `pester.yml` / `release.yml` / `wiki.yml` adapted to the `src/` layout (workflow `paths`, PSScriptAnalyzer targets, release ZIP of `src/` contents).
+  - Bump deprecated GitHub Actions (Node 20 runtime warnings): `actions/checkout@v4` -> `v7`, `actions/upload-artifact@v4` -> `v7`, `softprops/action-gh-release@v2` -> `v3`.
+
+### Fixed
+
+- Home wiki page: describe the WebParts and Orphaned Sites cleanups as implemented (they stopped being placeholders in 1.2.0).
+
 ## [1.2.0] - 2026-06-11
 
 ### Added
