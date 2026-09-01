@@ -1,4 +1,4 @@
-@{
+﻿@{
     # Settings consumed by Invoke-ScriptAnalyzer in CI and the local lint task.
     #
     # PSUseSingularNouns is excluded because the public function

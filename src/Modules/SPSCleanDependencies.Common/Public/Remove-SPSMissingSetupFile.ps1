@@ -1,4 +1,4 @@
-function Remove-SPSMissingSetupFile {
+﻿function Remove-SPSMissingSetupFile {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (

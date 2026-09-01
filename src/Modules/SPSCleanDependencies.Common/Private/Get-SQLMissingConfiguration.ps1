@@ -1,4 +1,4 @@
-function Get-SQLMissingConfiguration {
+﻿function Get-SQLMissingConfiguration {
     param
     (
         [Parameter()]

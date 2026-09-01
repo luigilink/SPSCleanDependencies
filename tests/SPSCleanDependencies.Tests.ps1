@@ -1,4 +1,4 @@
-# Pester tests for SPSCleanDependencies.ps1
+﻿# Pester tests for SPSCleanDependencies.ps1
 # Resolve repo root - works on CI/CD (GitHub Actions) and local runs
 
 BeforeAll {

@@ -1,4 +1,4 @@
-function Remove-SPSMissingConfiguration {
+﻿function Remove-SPSMissingConfiguration {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (

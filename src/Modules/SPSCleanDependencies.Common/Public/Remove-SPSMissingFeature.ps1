@@ -1,4 +1,4 @@
-function Remove-SPSMissingFeature {
+﻿function Remove-SPSMissingFeature {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
