@@ -1,4 +1,4 @@
-function Get-SQLMissingAssemblyInfo {
+﻿function Get-SQLMissingAssemblyInfo {
     param
     (
         [Parameter()]

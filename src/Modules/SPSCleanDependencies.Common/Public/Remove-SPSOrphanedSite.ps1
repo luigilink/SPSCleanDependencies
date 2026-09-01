@@ -1,4 +1,4 @@
-function Remove-SPSOrphanedSite {
+﻿function Remove-SPSOrphanedSite {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (

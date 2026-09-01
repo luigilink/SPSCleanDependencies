@@ -1,4 +1,4 @@
-function Get-SPSReportHtmlScript {
+﻿function Get-SPSReportHtmlScript {
     <#
         .SYNOPSIS
         Returns the vanilla-JavaScript block that renders the interactive per-category tables.

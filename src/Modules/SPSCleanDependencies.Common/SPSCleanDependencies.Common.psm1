@@ -1,4 +1,4 @@
-# =====================================================================================
+﻿# =====================================================================================
 # SPSCleanDependencies.Common - module loader
 #
 # Dot-sources every *.ps1 in Private/ and Public/, then exports only the public

@@ -1,4 +1,4 @@
-function Get-SQLMissingWebPartInfo {
+﻿function Get-SQLMissingWebPartInfo {
     param
     (
         [Parameter()]

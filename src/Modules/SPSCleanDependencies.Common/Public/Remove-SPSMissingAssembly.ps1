@@ -1,4 +1,4 @@
-function Remove-SPSMissingAssembly {
+﻿function Remove-SPSMissingAssembly {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (

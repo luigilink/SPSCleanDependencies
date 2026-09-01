@@ -1,4 +1,4 @@
-class SPMissingFeaturesInfo {
+﻿class SPMissingFeaturesInfo {
     [System.String]$Database
     [System.String]$Category
     [System.String]$FeatureID

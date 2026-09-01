@@ -1,4 +1,4 @@
-function Export-SPSCleanDependenciesReport {
+﻿function Export-SPSCleanDependenciesReport {
     <#
         .SYNOPSIS
         Generates a self-contained HTML report from a SPSCleanDependencies results JSON.

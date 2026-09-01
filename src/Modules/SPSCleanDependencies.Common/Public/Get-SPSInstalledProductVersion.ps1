@@ -1,4 +1,4 @@
-function Get-SPSInstalledProductVersion {
+﻿function Get-SPSInstalledProductVersion {
     [OutputType([System.Version])]
     param ()
 

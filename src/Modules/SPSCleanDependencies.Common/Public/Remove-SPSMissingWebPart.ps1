@@ -1,4 +1,4 @@
-function Remove-SPSMissingWebPart {
+﻿function Remove-SPSMissingWebPart {
     [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (

@@ -1,4 +1,4 @@
-function Get-SQLMissingSetupFileInfo {
+﻿function Get-SQLMissingSetupFileInfo {
     param
     (
         [Parameter()]
