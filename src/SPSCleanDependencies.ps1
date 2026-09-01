@@ -1,4 +1,4 @@
-<#
+﻿<#
     .SYNOPSIS
     SPSCleanDependencies script for SharePoint Server
 
@@ -10,7 +10,7 @@
     .PARAMETER FileName
     Specify the name of the file to be used for the script.
     The file name can be in the format: Application-Environment-Farm
-    Example: CONTOSO-PROD-SP2019
+    Example: CONTOSO-PROD-SPSE
     The script will create a JSON file with the same name in the Results folder.
 
     .PARAMETER Clean
@@ -26,8 +26,8 @@
     Set to 0 to disable pruning.
 
     .EXAMPLE
-    SPSCleanDependencies.ps1 -FileName 'CONTOSO-PROD-SP2019'
-    This command will create a JSON file in the Results folder with the name CONTOSO-PROD-SP2019.json
+    SPSCleanDependencies.ps1 -FileName 'CONTOSO-PROD-SPSE'
+    This command will create a JSON file in the Results folder with the name CONTOSO-PROD-SPSE.json
     The script will check for Missing server side dependencies and create a log file in the Logs folder.
 
     .NOTES
@@ -89,15 +89,12 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 # Setting power management plan to High Performance
 Start-Process -FilePath "$env:SystemRoot\system32\powercfg.exe" -ArgumentList '/s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' -NoNewWindow
 
-# Load SharePoint PowerShell Snap-in or Import-Module
+# Load the SharePoint Server management module (Subscription Edition)
 try {
-    $installedVersion = Get-SPSInstalledProductVersion
-    if ($installedVersion.ProductMajorPart -eq 15 -or $installedVersion.ProductBuildPart -le 12999) {
-        if ($null -eq (Get-PSSnapin -Name Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue)) {
-            Add-PSSnapin Microsoft.SharePoint.PowerShell
-        }
-    }
-    else {
+    # Ensure SharePoint Server is installed on this host (throws if the ISAPI path is missing)
+    $null = Get-SPSInstalledProductVersion
+    # Import the SharePointServer module (idempotent)
+    if ($null -eq (Get-Module -Name SharePointServer)) {
         Import-Module SharePointServer -Verbose:$false -WarningAction SilentlyContinue -DisableNameChecking
     }
 }
