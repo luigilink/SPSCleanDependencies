@@ -1,4 +1,4 @@
-# Pester tests for the SPSCleanDependencies.Common module.
+﻿# Pester tests for the SPSCleanDependencies.Common module.
 # Resolve repo root - works on both local and CI/CD.
 
 BeforeAll {
@@ -14,7 +14,7 @@ BeforeAll {
     $spsStubs = @(
         'Get-SPContentDatabase', 'Get-SPSite', 'Get-SPWeb', 'Get-SPFarm', 'Set-SPSite',
         'Test-SPContentDatabase', 'Install-SPFeature', 'Uninstall-SPFeature',
-        'Disable-SPFeature', 'Invoke-Sqlcmd', 'Add-PSSnapin', 'Get-PSSnapin'
+        'Disable-SPFeature', 'Invoke-Sqlcmd'
     )
     foreach ($name in $spsStubs) {
         if (-not (Get-Command -Name $name -ErrorAction SilentlyContinue)) {

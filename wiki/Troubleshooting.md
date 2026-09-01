@@ -16,16 +16,14 @@ The tool resolves web part, setup file, assembly and configuration locations by 
 
 ## `Administrator rights are required`
 
-The script must run in an **elevated** PowerShell session (it loads the SharePoint snap-in, reads content databases and, in `-Clean` mode, modifies farm objects). Re-run PowerShell as Administrator.
+The script must run in an **elevated** PowerShell session (it loads the SharePoint Server module, reads content databases and, in `-Clean` mode, modifies farm objects). Re-run PowerShell as Administrator.
 
 ## SharePoint cmdlets are not available
 
-The entry script loads the SharePoint management shell for you:
+The entry script loads the SharePoint Server management module (`SharePointServer`) for you. Run the script **on a SharePoint Server Subscription Edition server** with the management tools installed, using a farm account (or an account that is a member of the Farm Administrators group and has the `SharePoint_Shell_Access` role on the content databases).
 
-- SharePoint 2016 (build ≤ 12999) → adds the `Microsoft.SharePoint.PowerShell` PSSnapin.
-- SharePoint 2019 / Subscription Edition → imports the `SharePointServer` module.
-
-Run the script **on a SharePoint server** with the management tools installed, using a farm account (or an account that is a member of the Farm Administrators group and has the `SharePoint_Shell_Access` role on the content databases).
+> [!NOTE]
+> SharePoint Server 2016 and 2019 (which exposed cmdlets through the legacy `Microsoft.SharePoint.PowerShell` snap-in) reached end of support on 14 July 2026 and are no longer supported. Use the previous major release (v1.4.0) for those versions.
 
 ## Nothing happens / `Missing <FileName>.json`
 

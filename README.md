@@ -9,7 +9,10 @@
 
 SPSCleanDependencies is a PowerShell script tool to clean Missing Server Dependencies in your SharePoint Farm.
 
-It's compatible with all supported versions for SharePoint OnPremises (2016 to Subscription Edition).
+It's compatible with **SharePoint Server Subscription Edition**.
+
+> [!NOTE]
+> SharePoint Server 2016 and 2019 reached end of support on 14 July 2026. If you are still running one of those versions, use the previous major release ([v1.4.0](https://github.com/luigilink/SPSCleanDependencies/releases/tag/v1.4.0)).
 
 > [!IMPORTANT]
 > Backup content database first​ and test script on testing environment

@@ -1,14 +1,20 @@
 # SPSCleanDependencies - Release Notes
 
-## [1.4.0] - 2026-07-09
+## [2.0.0] - 2026-09-01
 
-### Added
+### Removed
 
-- **Results history** — the audit no longer overwrites its output blindly. Before each run the current `Results\<FileName>.json` is archived into `Results\history\` with a `yyyyMMdd-HHmm` timestamp:
-  - `Backup-SPSJsonFile` (public) creates the timestamped copy.
-  - `Clear-SPSLogFolder` (public) is the single retention/rotation implementation, reused for both transcript logs (`*.log`) and archived snapshots (`*.json`). `Retention = 0` disables pruning.
-- **HTML report** — `Export-SPSCleanDependenciesReport` (public) renders the results JSON as a self-contained, dependency-free HTML file: one summary card per dependency category plus a filterable/sortable table per non-empty category, or a clean "nothing to clean" state. Backed by internal helpers `ConvertTo-SPSHtmlEncoded`, `Get-SPSReportHtmlHead`, `Get-SPSReportCardHtml`, `Get-SPSReportHtmlScript` (pattern from SPSUpdate.Common).
-- **Entry script** — the audit run now archives the previous results, writes `Results\<FileName>.html`, and prunes old history/logs. The current `Results\<FileName>.json` stays stable (still the exact input consumed by `-Clean`); only the history copies are timestamped. New `-HistoryRetentionDays` (default 30) and `-LogRetentionDays` (default 180) parameters control retention; `0` disables pruning.
-- Pester coverage for the new functions and the audit-branch wiring.
+- **BREAKING** — dropped support for SharePoint Server 2016 and 2019 (both reached end of support on 14 July 2026). SPSCleanDependencies now targets **SharePoint Server Subscription Edition only**.
+- Removed the installed-build detection and the legacy `Microsoft.SharePoint.PowerShell` PSSnapin loading path (`Get-PSSnapin` / `Add-PSSnapin`) from `SPSCleanDependencies.ps1`.
+
+### Changed
+
+- `SPSCleanDependencies.ps1` now loads the `SharePointServer` module only (idempotent), guarded by a clear "SharePoint installed" check via `Get-SPSInstalledProductVersion`.
+- Neutralized the version-specific help examples (`CONTOSO-PROD-SP2019` → `CONTOSO-PROD-SPSE`).
+- Documentation (README, wiki) now states Subscription Edition as the only supported version.
+
+### Migration
+
+- Users still running SharePoint Server 2016 or 2019 should stay on the previous major release (v1.4.0).
 
 A full list of changes in each version can be found in the [change log](CHANGELOG.md)
