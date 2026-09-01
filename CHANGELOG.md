@@ -3,6 +3,23 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-01
+
+### Removed
+
+- **BREAKING** — dropped support for SharePoint Server 2016 and 2019 (both reached end of support on 14 July 2026). SPSCleanDependencies now targets **SharePoint Server Subscription Edition only**.
+- Removed the installed-build detection and the legacy `Microsoft.SharePoint.PowerShell` PSSnapin loading path (`Get-PSSnapin` / `Add-PSSnapin`) from `SPSCleanDependencies.ps1`.
+
+### Changed
+
+- `SPSCleanDependencies.ps1` now loads the `SharePointServer` module only (idempotent), guarded by a clear "SharePoint installed" check via `Get-SPSInstalledProductVersion`.
+- Neutralized the version-specific help examples (`CONTOSO-PROD-SP2019` → `CONTOSO-PROD-SPSE`).
+- Documentation (README, wiki) now states Subscription Edition as the only supported version. [issue #12](https://github.com/luigilink/SPSCleanDependencies/issues/12)
+
+### Migration
+
+- Users still running SharePoint Server 2016 or 2019 should stay on the previous major release ([v1.4.0](https://github.com/luigilink/SPSCleanDependencies/releases/tag/v1.4.0)).
+
 ## [1.4.0] - 2026-07-09
 
 ### Added
