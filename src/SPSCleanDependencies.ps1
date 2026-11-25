@@ -60,6 +60,111 @@ param(
 
 #requires -Version 5.1
 
+function Get-SPSCleanupResult {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Operation,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Identifier,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Status,
+
+        [Parameter()]
+        [System.String]
+        $Message
+    )
+
+    return [PSCustomObject]@{
+        Operation  = $Operation
+        Identifier = $Identifier
+        Status     = $Status
+        Message    = $Message
+    }
+}
+
+function Invoke-SPSOperationWithStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Operation,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Identifier,
+
+        [Parameter(Mandatory = $true)]
+        [ScriptBlock]
+        $ScriptBlock
+    )
+
+    $operationOutput = @(& $ScriptBlock 2>&1)
+    $operationErrors = New-Object -TypeName System.Collections.ArrayList
+
+    foreach ($item in $operationOutput) {
+        if ($item -is [System.Management.Automation.ErrorRecord]) {
+            [void]$operationErrors.Add($item)
+            continue
+        }
+        Write-Output $item
+    }
+
+    if ($operationErrors.Count -gt 0) {
+        $errorMessage = ($operationErrors | ForEach-Object {
+                if ($null -ne $_.Exception -and -not [string]::IsNullOrWhiteSpace($_.Exception.Message)) {
+                    $_.Exception.Message
+                }
+                else {
+                    $_.ToString()
+                }
+            }) -join ' | '
+
+        Write-Error "[$Operation] Failed for '$Identifier'. Details: $errorMessage"
+        return Get-SPSCleanupResult -Operation $Operation -Identifier $Identifier -Status 'Failed' -Message $errorMessage
+    }
+
+    return Get-SPSCleanupResult -Operation $Operation -Identifier $Identifier -Status 'Completed' -Message ''
+}
+
+function Add-SPSSkippedCleanupResult {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Collections.ArrayList]
+        $Results,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Operation,
+
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $Identifier,
+
+        [Parameter(Mandatory = $true)]
+        [System.String[]]
+        $MissingFields
+    )
+
+    $missingFieldsMessage = $MissingFields -join ', '
+    $message = "Skipped because required field(s) are missing: $missingFieldsMessage"
+    Write-Warning "[$Operation] $Identifier - $message"
+    [void]$Results.Add((Get-SPSCleanupResult -Operation $Operation -Identifier $Identifier -Status 'Skipped' -Message $message))
+}
+
+function Test-SPSHasValue {
+    param(
+        [Parameter()]
+        [object]
+        $Value
+    )
+
+    return -not [string]::IsNullOrWhiteSpace([System.String]$Value)
+}
+
 #region Initialization
 # Clear the host console
 Clear-Host
@@ -156,118 +261,263 @@ Write-Output '-------------------------------------'
 #endregion
 
 #region Main Process
-if ($Clean) {
-    Write-Output 'Removing Missing Server Side Dependency References'
-    Write-Output "Getting content of json: $pathJsonFile"
-    if (Test-Path $pathJsonFile) {
-        $jsonEnvCfg = get-content $pathJsonFile | ConvertFrom-Json
-        if (($jsonEnvCfg.MissingFeature).Count -ne 0) {
-            Write-Output 'Removing Missing Feature References'
-            foreach ($missingFeature in $jsonEnvCfg.MissingFeature) {
-                Remove-SPSMissingFeature -Database $missingFeature.Database `
-                    -FeatureID $missingFeature.FeatureID `
-                    -SiteID $missingFeature.SiteId
-            }
-        }
-        if (($jsonEnvCfg.MissingWebPart).Count -ne 0) {
-            Write-Output 'Removing Missing WebPart References'
-            foreach ($missingWebPart in $jsonEnvCfg.MissingWebPart) {
-                Remove-SPSMissingWebPart -Database $missingWebPart.Database `
-                    -WebPartID $missingWebPart.WebPartID `
-                    -StorageKey $missingWebPart.StorageKey `
-                    -SiteID $missingWebPart.SiteID `
-                    -WebID $missingWebPart.WebID `
-                    -DirName $missingWebPart.DirName `
-                    -LeafName $missingWebPart.LeafName
-            }
-        }
-        if (($jsonEnvCfg.MissingSetupFile).Count -ne 0) {
-            Write-Output 'Removing Missing SetupFile References'
-            foreach ($missingSetupFile in $jsonEnvCfg.MissingSetupFile) {
-                Remove-SPSMissingSetupFile -Database $missingSetupFile.Database `
-                    -FileID $missingSetupFile.FileID `
-                    -SiteID $missingSetupFile.SiteId `
-                    -WebID $missingSetupFile.WebID
-            }
-        }
-        if (($jsonEnvCfg.MissingAssembly).Count -ne 0) {
-            Write-Output 'Removing Missing Assemblies References'
-            foreach ($missingAssembly in $jsonEnvCfg.MissingAssembly) {
-                Remove-SPSMissingAssembly -Database $missingAssembly.Database `
-                    -AssemblyID $missingAssembly.AssemblyID `
-                    -SiteID $missingAssembly.SiteId `
-                    -WebID $missingAssembly.WebID `
-                    -HostType $missingAssembly.HostType `
-                    -HostID $missingAssembly.HostID
-            }
-        }
-        if (($jsonEnvCfg.SiteOrphan).Count -ne 0) {
-            Write-Output 'Removing Orphaned Site References'
-            foreach ($orphanedSite in $jsonEnvCfg.SiteOrphan) {
-                Remove-SPSOrphanedSite -Database $orphanedSite.Database `
-                    -SiteID $orphanedSite.SiteID
-            }
-        }
-        if (($jsonEnvCfg.Configuration).Count -ne 0) {
-            Write-Output 'Checking Classic Authentication Account of each SPSite object'
-            $defautSPSiteOwner = (Get-SPFarm).DefaultServiceAccount.Name
-            $sitesWithClassicAuth = Get-SPSite -Limit ALL | Where-Object -FilterScript { $_.Owner -notlike 'i:0#.w|*' }
-            if ($null -ne $sitesWithClassicAuth) {
-                foreach ($site in $sitesWithClassicAuth) {
-                    if ($site.Url -notlike '*sitemaster-*') {
-                        Write-Output "Site $($site.Url) has Classic Authentication Owner: $($site.Owner)"
-                        Write-Output "Updating SPSite Owner of $($site.Url)"
-                        Write-Output "User $($site.Owner) replaced by $($defautSPSiteOwner)"
-                        Set-SPSite $site -OwnerAlias "$($defautSPSiteOwner)" -Verbose
+$scriptExitCode = 0
+$cleanupResults = New-Object -TypeName System.Collections.ArrayList
+
+try {
+    if ($Clean) {
+        Write-Output 'Removing Missing Server Side Dependency References'
+        Write-Output "Getting content of json: $pathJsonFile"
+        if (Test-Path $pathJsonFile) {
+            $jsonEnvCfg = Get-Content -Path $pathJsonFile -Raw -Encoding UTF8 | ConvertFrom-Json
+
+            $missingFeatures = @($jsonEnvCfg.MissingFeature)
+            if ($missingFeatures.Count -ne 0) {
+                Write-Output 'Removing Missing Feature References'
+                foreach ($missingFeature in $missingFeatures) {
+                    $identifier = "$($missingFeature.Database)|FeatureID=$($missingFeature.FeatureID)|SiteID=$($missingFeature.SiteID)"
+                    $missingFields = @()
+                    if (-not (Test-SPSHasValue $missingFeature.Database)) { $missingFields += 'Database' }
+                    if (-not (Test-SPSHasValue $missingFeature.FeatureID)) { $missingFields += 'FeatureID' }
+                    if (-not (Test-SPSHasValue $missingFeature.SiteID)) { $missingFields += 'SiteID' }
+                    if ($missingFields.Count -gt 0) {
+                        Add-SPSSkippedCleanupResult -Results $cleanupResults -Operation 'MissingFeature' -Identifier $identifier -MissingFields $missingFields
+                        continue
                     }
+
+                    $result = Invoke-SPSOperationWithStatus -Operation 'MissingFeature' -Identifier $identifier -ScriptBlock {
+                        Remove-SPSMissingFeature -Database $missingFeature.Database `
+                            -FeatureID $missingFeature.FeatureID `
+                            -SiteID $missingFeature.SiteID
+                    }
+                    [void]$cleanupResults.Add($result)
                 }
             }
-            Write-Output 'Removing Missing Configuration References'
-            foreach ($missingConfiguration in $jsonEnvCfg.Configuration) {
-                Remove-SPSMissingConfiguration -Database $missingConfiguration.Database `
-                    -SiteID $missingConfiguration.SiteId `
-                    -Login $missingConfiguration.Login
+
+            $missingWebParts = @($jsonEnvCfg.MissingWebPart)
+            if ($missingWebParts.Count -ne 0) {
+                Write-Output 'Removing Missing WebPart References'
+                foreach ($missingWebPart in $missingWebParts) {
+                    $identifier = "$($missingWebPart.Database)|WebPartID=$($missingWebPart.WebPartID)|StorageKey=$($missingWebPart.StorageKey)"
+                    $missingFields = @()
+                    if (-not (Test-SPSHasValue $missingWebPart.Database)) { $missingFields += 'Database' }
+                    if (-not (Test-SPSHasValue $missingWebPart.WebPartID)) { $missingFields += 'WebPartID' }
+                    if (-not (Test-SPSHasValue $missingWebPart.SiteID)) { $missingFields += 'SiteID' }
+                    if (-not (Test-SPSHasValue $missingWebPart.WebID)) { $missingFields += 'WebID' }
+                    if (-not (Test-SPSHasValue $missingWebPart.DirName)) { $missingFields += 'DirName' }
+                    if (-not (Test-SPSHasValue $missingWebPart.LeafName)) { $missingFields += 'LeafName' }
+                    if ($missingFields.Count -gt 0) {
+                        Add-SPSSkippedCleanupResult -Results $cleanupResults -Operation 'MissingWebPart' -Identifier $identifier -MissingFields $missingFields
+                        continue
+                    }
+
+                    $result = Invoke-SPSOperationWithStatus -Operation 'MissingWebPart' -Identifier $identifier -ScriptBlock {
+                        Remove-SPSMissingWebPart -Database $missingWebPart.Database `
+                            -WebPartID $missingWebPart.WebPartID `
+                            -StorageKey $missingWebPart.StorageKey `
+                            -SiteID $missingWebPart.SiteID `
+                            -WebID $missingWebPart.WebID `
+                            -DirName $missingWebPart.DirName `
+                            -LeafName $missingWebPart.LeafName
+                    }
+                    [void]$cleanupResults.Add($result)
+                }
             }
+
+            $missingSetupFiles = @($jsonEnvCfg.MissingSetupFile)
+            if ($missingSetupFiles.Count -ne 0) {
+                Write-Output 'Removing Missing SetupFile References'
+                foreach ($missingSetupFile in $missingSetupFiles) {
+                    $identifier = "$($missingSetupFile.Database)|FileID=$($missingSetupFile.FileID)|SiteID=$($missingSetupFile.SiteID)|WebID=$($missingSetupFile.WebID)"
+                    $missingFields = @()
+                    if (-not (Test-SPSHasValue $missingSetupFile.Database)) { $missingFields += 'Database' }
+                    if (-not (Test-SPSHasValue $missingSetupFile.FileID)) { $missingFields += 'FileID' }
+                    if (-not (Test-SPSHasValue $missingSetupFile.SiteID)) { $missingFields += 'SiteID' }
+                    if (-not (Test-SPSHasValue $missingSetupFile.WebID)) { $missingFields += 'WebID' }
+                    if ($missingFields.Count -gt 0) {
+                        Add-SPSSkippedCleanupResult -Results $cleanupResults -Operation 'MissingSetupFile' -Identifier $identifier -MissingFields $missingFields
+                        continue
+                    }
+
+                    $result = Invoke-SPSOperationWithStatus -Operation 'MissingSetupFile' -Identifier $identifier -ScriptBlock {
+                        Remove-SPSMissingSetupFile -Database $missingSetupFile.Database `
+                            -FileID $missingSetupFile.FileID `
+                            -SiteID $missingSetupFile.SiteID `
+                            -WebID $missingSetupFile.WebID
+                    }
+                    [void]$cleanupResults.Add($result)
+                }
+            }
+
+            $missingAssemblies = @($jsonEnvCfg.MissingAssembly)
+            if ($missingAssemblies.Count -ne 0) {
+                Write-Output 'Removing Missing Assemblies References'
+                foreach ($missingAssembly in $missingAssemblies) {
+                    $identifier = "$($missingAssembly.Database)|AssemblyID=$($missingAssembly.AssemblyID)|HostType=$($missingAssembly.HostType)|HostID=$($missingAssembly.HostID)"
+                    $missingFields = @()
+                    if (-not (Test-SPSHasValue $missingAssembly.Database)) { $missingFields += 'Database' }
+                    if (-not (Test-SPSHasValue $missingAssembly.AssemblyID)) { $missingFields += 'AssemblyID' }
+                    if (-not (Test-SPSHasValue $missingAssembly.SiteID)) { $missingFields += 'SiteID' }
+                    if (-not (Test-SPSHasValue $missingAssembly.WebID)) { $missingFields += 'WebID' }
+                    if (-not (Test-SPSHasValue $missingAssembly.HostType)) { $missingFields += 'HostType' }
+                    if (-not (Test-SPSHasValue $missingAssembly.HostID)) { $missingFields += 'HostID' }
+                    if ($missingFields.Count -gt 0) {
+                        Add-SPSSkippedCleanupResult -Results $cleanupResults -Operation 'MissingAssembly' -Identifier $identifier -MissingFields $missingFields
+                        continue
+                    }
+
+                    $result = Invoke-SPSOperationWithStatus -Operation 'MissingAssembly' -Identifier $identifier -ScriptBlock {
+                        Remove-SPSMissingAssembly -Database $missingAssembly.Database `
+                            -AssemblyID $missingAssembly.AssemblyID `
+                            -SiteID $missingAssembly.SiteID `
+                            -WebID $missingAssembly.WebID `
+                            -HostType $missingAssembly.HostType `
+                            -HostID $missingAssembly.HostID
+                    }
+                    [void]$cleanupResults.Add($result)
+                }
+            }
+
+            $orphanedSites = @($jsonEnvCfg.SiteOrphan)
+            if ($orphanedSites.Count -ne 0) {
+                Write-Output 'Removing Orphaned Site References'
+                foreach ($orphanedSite in $orphanedSites) {
+                    $identifier = "$($orphanedSite.Database)|SiteID=$($orphanedSite.SiteID)"
+                    $missingFields = @()
+                    if (-not (Test-SPSHasValue $orphanedSite.Database)) { $missingFields += 'Database' }
+                    if (-not (Test-SPSHasValue $orphanedSite.SiteID)) { $missingFields += 'SiteID' }
+                    if ($missingFields.Count -gt 0) {
+                        Add-SPSSkippedCleanupResult -Results $cleanupResults -Operation 'SiteOrphan' -Identifier $identifier -MissingFields $missingFields
+                        continue
+                    }
+
+                    $result = Invoke-SPSOperationWithStatus -Operation 'SiteOrphan' -Identifier $identifier -ScriptBlock {
+                        Remove-SPSOrphanedSite -Database $orphanedSite.Database `
+                            -SiteID $orphanedSite.SiteID
+                    }
+                    [void]$cleanupResults.Add($result)
+                }
+            }
+
+            $missingConfigurations = @($jsonEnvCfg.Configuration)
+            if ($missingConfigurations.Count -ne 0) {
+                Write-Output 'Checking Classic Authentication Account of each SPSite object'
+                $defautSPSiteOwner = (Get-SPFarm).DefaultServiceAccount.Name
+                $sitesWithClassicAuth = Get-SPSite -Limit ALL | Where-Object -FilterScript { $_.Owner -notlike 'i:0#.w|*' }
+                if ($null -ne $sitesWithClassicAuth) {
+                    foreach ($site in $sitesWithClassicAuth) {
+                        if ($site.Url -notlike '*sitemaster-*') {
+                            Write-Output "Site $($site.Url) has Classic Authentication Owner: $($site.Owner)"
+                            Write-Output "Updating SPSite Owner of $($site.Url)"
+                            Write-Output "User $($site.Owner) replaced by $($defautSPSiteOwner)"
+                            Set-SPSite $site -OwnerAlias "$($defautSPSiteOwner)" -Verbose
+                        }
+                    }
+                }
+                Write-Output 'Removing Missing Configuration References'
+                foreach ($missingConfiguration in $missingConfigurations) {
+                    $identifier = "$($missingConfiguration.Database)|SiteID=$($missingConfiguration.SiteID)|Login=$($missingConfiguration.Login)"
+                    $missingFields = @()
+                    if (-not (Test-SPSHasValue $missingConfiguration.Database)) { $missingFields += 'Database' }
+                    if (-not (Test-SPSHasValue $missingConfiguration.SiteID)) { $missingFields += 'SiteID' }
+                    if (-not (Test-SPSHasValue $missingConfiguration.Login)) { $missingFields += 'Login' }
+                    if ($missingFields.Count -gt 0) {
+                        Add-SPSSkippedCleanupResult -Results $cleanupResults -Operation 'Configuration' -Identifier $identifier -MissingFields $missingFields
+                        continue
+                    }
+
+                    $result = Invoke-SPSOperationWithStatus -Operation 'Configuration' -Identifier $identifier -ScriptBlock {
+                        Remove-SPSMissingConfiguration -Database $missingConfiguration.Database `
+                            -SiteID $missingConfiguration.SiteID `
+                            -Login $missingConfiguration.Login
+                    }
+                    [void]$cleanupResults.Add($result)
+                }
+            }
+        }
+        else {
+            Throw "Missing $pathJsonFile`nPlease re-run this script without the switch parameter Clean"
         }
     }
     else {
-        Throw "Missing $pathJsonFile`nPlease re-run this script without the switch parameter Clean"
+        Write-Output 'Getting Missing Server Side Dependencies'
+
+        # Archive the previous results snapshot (if any) before it is overwritten,
+        # so a history of past audits is kept under Results\history.
+        [void](Backup-SPSJsonFile -Path $pathJsonFile -HistoryFolder $pathHistoryFolder)
+
+        $auditResult = Invoke-SPSOperationWithStatus -Operation 'Audit' -Identifier $pathJsonFile -ScriptBlock {
+            Get-SPSMissingServerDependencies -Path $pathJsonFile
+        }
+
+        if ($auditResult.Status -eq 'Failed') {
+            Throw "Audit failed for $pathJsonFile"
+        }
+
+        # Generate a self-contained HTML report from the fresh results.
+        if (Test-Path $pathJsonFile) {
+            Write-Output "Generating HTML report: $pathHtmlFile"
+            $reportResult = Invoke-SPSOperationWithStatus -Operation 'Report' -Identifier $pathHtmlFile -ScriptBlock {
+                Export-SPSCleanDependenciesReport -InputFile $pathJsonFile `
+                    -OutputFile $pathHtmlFile `
+                    -FarmName $FileName `
+                    -Version $SPSCleanDependenciesVersion
+            }
+
+            if ($reportResult.Status -eq 'Failed') {
+                Throw "Report generation failed for $pathHtmlFile"
+            }
+        }
+        else {
+            Throw "Audit did not produce expected file: $pathJsonFile"
+        }
+
+        # Prune old history snapshots and transcript logs.
+        Clear-SPSLogFolder -Path $pathHistoryFolder -Retention $HistoryRetentionDays -Extension '*.json'
+        Clear-SPSLogFolder -Path $pathLogsFolder -Retention $LogRetentionDays -Extension '*.log'
     }
 }
-else {
-    Write-Output 'Getting Missing Server Side Dependencies'
+catch {
+    $scriptExitCode = 1
+    Write-Error "SPSCleanDependencies failed: $($_.Exception.Message)"
+}
+finally {
+    if ($Clean) {
+        if ($cleanupResults.Count -gt 0) {
+            Write-Output '-----------------------------------------------'
+            Write-Output 'Cleanup summary by status'
+            $statusGroups = $cleanupResults | Group-Object -Property Status | Sort-Object -Property Name
+            foreach ($statusGroup in $statusGroups) {
+                Write-Output (" * {0}: {1}" -f $statusGroup.Name, $statusGroup.Count)
+            }
+            Write-Output (" * Total cleanup items: {0}" -f $cleanupResults.Count)
+            Write-Output '-----------------------------------------------'
+        }
+        else {
+            Write-Output 'No cleanup entries found in the JSON file.'
+        }
 
-    # Archive the previous results snapshot (if any) before it is overwritten,
-    # so a history of past audits is kept under Results\history.
-    [void](Backup-SPSJsonFile -Path $pathJsonFile -HistoryFolder $pathHistoryFolder)
-
-    Get-SPSMissingServerDependencies -Path $pathJsonFile
-
-    # Generate a self-contained HTML report from the fresh results.
-    if (Test-Path $pathJsonFile) {
-        Write-Output "Generating HTML report: $pathHtmlFile"
-        [void](Export-SPSCleanDependenciesReport -InputFile $pathJsonFile `
-                -OutputFile $pathHtmlFile `
-                -FarmName $FileName `
-                -Version $SPSCleanDependenciesVersion)
+        if ((@($cleanupResults | Where-Object -FilterScript { $_.Status -eq 'Failed' })).Count -gt 0) {
+            $scriptExitCode = 1
+        }
     }
 
-    # Prune old history snapshots and transcript logs.
-    Clear-SPSLogFolder -Path $pathHistoryFolder -Retention $HistoryRetentionDays -Extension '*.json'
-    Clear-SPSLogFolder -Path $pathLogsFolder -Retention $LogRetentionDays -Extension '*.log'
+    $DateEnded = Get-Date
+    Write-Output '-----------------------------------------------'
+    Write-Output "| SPSCleanDependencies Script Completed"
+    Write-Output "| Started on  - $DateStarted"
+    Write-Output "| Ended on    - $DateEnded"
+    Write-Output "| Exit code   - $scriptExitCode"
+    Write-Output '-----------------------------------------------'
+
+    try {
+        Stop-Transcript | Out-Null
+    }
+    catch {
+        Write-Verbose 'Transcript was not active or could not be stopped.'
+    }
+
+    Remove-Module -Name 'SPSCleanDependencies.Common' -ErrorAction SilentlyContinue
+    Exit $scriptExitCode
 }
 #endregion
-
-# Clean-Up
-Trap { Continue }
-$DateEnded = Get-Date
-Write-Output '-----------------------------------------------'
-Write-Output "| SPSCleanDependencies Script Completed"
-Write-Output "| Started on  - $DateStarted"
-Write-Output "| Ended on    - $DateEnded"
-Write-Output '-----------------------------------------------'
-Stop-Transcript
-Remove-Variable * -ErrorAction SilentlyContinue
-Remove-Module -Name 'SPSCleanDependencies.Common' -ErrorAction SilentlyContinue
-$error.Clear()
-Exit

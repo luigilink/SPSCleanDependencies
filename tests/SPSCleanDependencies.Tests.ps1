@@ -185,6 +185,16 @@ Describe 'SPSCleanDependencies.ps1 Clean Branch' {
     It 'Should throw when the JSON results file is missing' {
         $script:scriptContent | Should -Match 'Throw\s+"Missing\s+\$pathJsonFile'
     }
+
+    It 'Should track and print a cleanup summary by status' {
+        $script:scriptContent | Should -Match 'Cleanup summary by status'
+        $script:scriptContent | Should -Match 'Group-Object\s+-Property\s+Status'
+    }
+
+    It 'Should set a non-zero exit code when cleanup contains failed items' {
+        $script:scriptContent | Should -Match 'Where-Object\s+-FilterScript\s+\{\s*\$_\.Status\s+-eq\s+''Failed''\s*\}'
+        $script:scriptContent | Should -Match '\$scriptExitCode\s*=\s*1'
+    }
 }
 Describe 'SPSCleanDependencies.ps1 Audit Branch (history + report)' {
 
@@ -204,5 +214,10 @@ Describe 'SPSCleanDependencies.ps1 Audit Branch (history + report)' {
     It 'Should derive the html file and history folder paths' {
         $script:scriptContent | Should -Match '\$pathHtmlFile\s*='
         $script:scriptContent | Should -Match '\$pathHistoryFolder\s*='
+    }
+
+    It 'Should fail the run when audit or report generation fails' {
+        $script:scriptContent | Should -Match 'Throw\s+"Audit failed for'
+        $script:scriptContent | Should -Match 'Throw\s+"Report generation failed for'
     }
 }
