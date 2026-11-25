@@ -47,10 +47,10 @@
             return
         }
 
-        $site = Get-SPSite -Limit All -Identity $SiteID -ErrorAction SilentlyContinue
+        $site = Get-SPSite -Limit All -Identity $SiteID -ErrorAction Stop
         if ($null -ne $site) {
             $isSiteReadOnly = $site.ReadOnly
-            $web = Get-SPWeb -Identity $WebID -Site $site -Limit ALL -ErrorAction SilentlyContinue
+            $web = Get-SPWeb -Identity $WebID -Site $site -Limit ALL -ErrorAction Stop
             if ($null -ne $web) {
                 $webAppUrl = ($site.WebApplication.Url).TrimEnd('/')
                 $pageUrl = "{0}/{1}/{2}" -f $webAppUrl, $DirName, $LeafName
@@ -92,6 +92,6 @@
         }
     }
     catch {
-        return $_
+        Throw ("Remove-SPSMissingWebPart failed (Database='{0}', WebPartID='{1}', StorageKey='{2}', SiteID='{3}', WebID='{4}', DirName='{5}', LeafName='{6}'). {7}" -f $Database, $WebPartID, $StorageKey, $SiteID, $WebID, $DirName, $LeafName, $_.Exception.Message)
     }
 }

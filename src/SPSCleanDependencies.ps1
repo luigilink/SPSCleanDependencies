@@ -110,7 +110,7 @@ function Invoke-SPSOperationWithStatus {
             [void]$operationErrors.Add($item)
             continue
         }
-        Write-Output $item
+        Write-Information $item -InformationAction Continue
     }
 
     if ($operationErrors.Count -gt 0) {
@@ -123,7 +123,7 @@ function Invoke-SPSOperationWithStatus {
                 }
             }) -join ' | '
 
-        Write-Error "[$Operation] Failed for '$Identifier'. Details: $errorMessage"
+        Write-Warning "[$Operation] Failed for '$Identifier'. Details: $errorMessage"
         return Get-SPSCleanupResult -Operation $Operation -Identifier $Identifier -Status 'Failed' -Message $errorMessage
     }
 
@@ -133,6 +133,7 @@ function Invoke-SPSOperationWithStatus {
 function Add-SPSSkippedCleanupResult {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [System.Collections.ArrayList]
         $Results,
 
@@ -269,9 +270,9 @@ try {
         Write-Output 'Removing Missing Server Side Dependency References'
         Write-Output "Getting content of json: $pathJsonFile"
         if (Test-Path $pathJsonFile) {
-            $jsonEnvCfg = Get-Content -Path $pathJsonFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            $jsonEnvCfg = Get-Content -Path $pathJsonFile -Raw | ConvertFrom-Json
 
-            $missingFeatures = @($jsonEnvCfg.MissingFeature)
+            $missingFeatures = @($jsonEnvCfg.MissingFeature | Where-Object -FilterScript { $null -ne $_ })
             if ($missingFeatures.Count -ne 0) {
                 Write-Output 'Removing Missing Feature References'
                 foreach ($missingFeature in $missingFeatures) {
@@ -294,7 +295,7 @@ try {
                 }
             }
 
-            $missingWebParts = @($jsonEnvCfg.MissingWebPart)
+            $missingWebParts = @($jsonEnvCfg.MissingWebPart | Where-Object -FilterScript { $null -ne $_ })
             if ($missingWebParts.Count -ne 0) {
                 Write-Output 'Removing Missing WebPart References'
                 foreach ($missingWebPart in $missingWebParts) {
@@ -304,6 +305,7 @@ try {
                     if (-not (Test-SPSHasValue $missingWebPart.WebPartID)) { $missingFields += 'WebPartID' }
                     if (-not (Test-SPSHasValue $missingWebPart.SiteID)) { $missingFields += 'SiteID' }
                     if (-not (Test-SPSHasValue $missingWebPart.WebID)) { $missingFields += 'WebID' }
+                    if (-not (Test-SPSHasValue $missingWebPart.StorageKey)) { $missingFields += 'StorageKey' }
                     if (-not (Test-SPSHasValue $missingWebPart.DirName)) { $missingFields += 'DirName' }
                     if (-not (Test-SPSHasValue $missingWebPart.LeafName)) { $missingFields += 'LeafName' }
                     if ($missingFields.Count -gt 0) {
@@ -324,7 +326,7 @@ try {
                 }
             }
 
-            $missingSetupFiles = @($jsonEnvCfg.MissingSetupFile)
+            $missingSetupFiles = @($jsonEnvCfg.MissingSetupFile | Where-Object -FilterScript { $null -ne $_ })
             if ($missingSetupFiles.Count -ne 0) {
                 Write-Output 'Removing Missing SetupFile References'
                 foreach ($missingSetupFile in $missingSetupFiles) {
@@ -349,18 +351,47 @@ try {
                 }
             }
 
-            $missingAssemblies = @($jsonEnvCfg.MissingAssembly)
+            $missingAssemblies = @($jsonEnvCfg.MissingAssembly | Where-Object -FilterScript { $null -ne $_ })
             if ($missingAssemblies.Count -ne 0) {
                 Write-Output 'Removing Missing Assemblies References'
                 foreach ($missingAssembly in $missingAssemblies) {
                     $identifier = "$($missingAssembly.Database)|AssemblyID=$($missingAssembly.AssemblyID)|HostType=$($missingAssembly.HostType)|HostID=$($missingAssembly.HostID)"
+
+                    if ((Test-SPSHasValue $missingAssembly.LookupStatus) -and $missingAssembly.LookupStatus -ne 'Found') {
+                        $lookupDetails = [System.String]$missingAssembly.LookupDetails
+                        $lookupMessage = "Skipped because LookupStatus is '$($missingAssembly.LookupStatus)'"
+                        if (Test-SPSHasValue $lookupDetails) {
+                            $lookupMessage = "$lookupMessage. $lookupDetails"
+                        }
+                        Write-Warning "[MissingAssembly] $identifier - $lookupMessage"
+                        [void]$cleanupResults.Add((Get-SPSCleanupResult -Operation 'MissingAssembly' -Identifier $identifier -Status 'Skipped' -Message $lookupMessage))
+                        continue
+                    }
+
                     $missingFields = @()
                     if (-not (Test-SPSHasValue $missingAssembly.Database)) { $missingFields += 'Database' }
                     if (-not (Test-SPSHasValue $missingAssembly.AssemblyID)) { $missingFields += 'AssemblyID' }
                     if (-not (Test-SPSHasValue $missingAssembly.SiteID)) { $missingFields += 'SiteID' }
-                    if (-not (Test-SPSHasValue $missingAssembly.WebID)) { $missingFields += 'WebID' }
                     if (-not (Test-SPSHasValue $missingAssembly.HostType)) { $missingFields += 'HostType' }
-                    if (-not (Test-SPSHasValue $missingAssembly.HostID)) { $missingFields += 'HostID' }
+
+                    $assemblyHostType = [System.String]$missingAssembly.HostType
+                    switch ($assemblyHostType) {
+                        '0' {
+                        }
+                        '1' {
+                            if (-not (Test-SPSHasValue $missingAssembly.WebID)) { $missingFields += 'WebID' }
+                        }
+                        '2' {
+                            if (-not (Test-SPSHasValue $missingAssembly.WebID)) { $missingFields += 'WebID' }
+                            if (-not (Test-SPSHasValue $missingAssembly.HostID)) { $missingFields += 'HostID' }
+                        }
+                        default {
+                            if (Test-SPSHasValue $assemblyHostType) {
+                                $missingFields += "HostType($assemblyHostType)"
+                            }
+                        }
+                    }
+
                     if ($missingFields.Count -gt 0) {
                         Add-SPSSkippedCleanupResult -Results $cleanupResults -Operation 'MissingAssembly' -Identifier $identifier -MissingFields $missingFields
                         continue
@@ -378,7 +409,7 @@ try {
                 }
             }
 
-            $orphanedSites = @($jsonEnvCfg.SiteOrphan)
+            $orphanedSites = @($jsonEnvCfg.SiteOrphan | Where-Object -FilterScript { $null -ne $_ })
             if ($orphanedSites.Count -ne 0) {
                 Write-Output 'Removing Orphaned Site References'
                 foreach ($orphanedSite in $orphanedSites) {
@@ -399,7 +430,7 @@ try {
                 }
             }
 
-            $missingConfigurations = @($jsonEnvCfg.Configuration)
+            $missingConfigurations = @($jsonEnvCfg.Configuration | Where-Object -FilterScript { $null -ne $_ })
             if ($missingConfigurations.Count -ne 0) {
                 Write-Output 'Checking Classic Authentication Account of each SPSite object'
                 $defautSPSiteOwner = (Get-SPFarm).DefaultServiceAccount.Name
@@ -410,7 +441,11 @@ try {
                             Write-Output "Site $($site.Url) has Classic Authentication Owner: $($site.Owner)"
                             Write-Output "Updating SPSite Owner of $($site.Url)"
                             Write-Output "User $($site.Owner) replaced by $($defautSPSiteOwner)"
-                            Set-SPSite $site -OwnerAlias "$($defautSPSiteOwner)" -Verbose
+                            $ownerUpdateIdentifier = "$($site.Url)|Owner=$($site.Owner)|NewOwner=$($defautSPSiteOwner)"
+                            $ownerUpdateResult = Invoke-SPSOperationWithStatus -Operation 'ConfigurationOwnerUpdate' -Identifier $ownerUpdateIdentifier -ScriptBlock {
+                                Set-SPSite $site -OwnerAlias "$($defautSPSiteOwner)" -Verbose
+                            }
+                            [void]$cleanupResults.Add($ownerUpdateResult)
                         }
                     }
                 }
