@@ -42,6 +42,8 @@ class SPMissingAssemblyInfo {
     [System.String]$HostType
     [System.String]$SiteID
     [System.String]$WebID
+    [System.String]$LookupStatus
+    [System.String]$LookupDetails
 }
 class SPMissingConfigurationInfo {
     [System.String]$Database
@@ -174,26 +176,65 @@ function Get-SPSMissingServerDependencies {
                     }
                     if ($null -ne $missingAssemblies) {
                         foreach ($missingAssembly in $missingAssemblies) {
-                            $assemblyInfo = ([regex]::Matches($missingAssembly.Message, '(?<=\[)(\w+\.\w+.*?)(?=\])')).value
-                            $sqlMissingAssemblies = Get-SQLMissingAssemblyInfo -DatabaseName "$($spContentDB.Name)" `
-                                -DatabaseServer "$($spContentDB.Server)" `
-                                -AssemblyInfo "$($assemblyInfo)"
-
-                            foreach ($sqlMissingAssembly in $sqlMissingAssemblies) {
-                                if ($sqlMissingAssembly -is [System.Management.Automation.ErrorRecord]) {
-                                    throw ("Get-SQLMissingAssemblyInfo returned an error for database '{0}' assembly '{1}': {2}" -f $spContentDB.Name, $assemblyInfo, $sqlMissingAssembly.Exception.Message)
-                                }
+                            $assemblyInfoMatch = [regex]::Match($missingAssembly.Message, '(?<=\[)(\w+\.\w+.*?)(?=\])')
+                            if (-not $assemblyInfoMatch.Success) {
                                 [void]$tbSPmissingAssemblies.Add([SPMissingAssemblyInfo]@{
                                         Database     = "$($spContentDB.Name)";
                                         Category     = $missingAssembly.Category;
                                         Message      = $missingAssembly.Message;
                                         Remedy       = $missingAssembly.Remedy;
-                                        AssemblyInfo = $assemblyInfo;
-                                        AssemblyID   = $sqlMissingAssembly.AssemblyID;
-                                        SiteID       = $sqlMissingAssembly.SiteID;
-                                        WebID        = $sqlMissingAssembly.WebID;
-                                        HostID       = $sqlMissingAssembly.HostID;
-                                        HostType     = $sqlMissingAssembly.HostType;
+                                        LookupStatus = 'ParseError';
+                                        LookupDetails = 'Unable to extract AssemblyInfo from Test-SPContentDatabase message.';
+                                    })
+                                continue
+                            }
+
+                            $assemblyInfo = $assemblyInfoMatch.Value
+                            try {
+                                $sqlMissingAssemblies = @(Get-SQLMissingAssemblyInfo -DatabaseName "$($spContentDB.Name)" `
+                                        -DatabaseServer "$($spContentDB.Server)" `
+                                        -AssemblyInfo "$($assemblyInfo)")
+                            }
+                            catch {
+                                [void]$tbSPmissingAssemblies.Add([SPMissingAssemblyInfo]@{
+                                        Database      = "$($spContentDB.Name)";
+                                        Category      = $missingAssembly.Category;
+                                        Message       = $missingAssembly.Message;
+                                        Remedy        = $missingAssembly.Remedy;
+                                        AssemblyInfo  = $assemblyInfo;
+                                        LookupStatus  = 'LookupError';
+                                        LookupDetails = $_.Exception.Message;
+                                    })
+                                continue
+                            }
+
+                            if ($sqlMissingAssemblies.Count -eq 0) {
+                                [void]$tbSPmissingAssemblies.Add([SPMissingAssemblyInfo]@{
+                                        Database      = "$($spContentDB.Name)";
+                                        Category      = $missingAssembly.Category;
+                                        Message       = $missingAssembly.Message;
+                                        Remedy        = $missingAssembly.Remedy;
+                                        AssemblyInfo  = $assemblyInfo;
+                                        LookupStatus  = 'NotFound';
+                                        LookupDetails = 'No matching EventReceivers rows were found for this assembly in SQL lookup.';
+                                    })
+                                continue
+                            }
+
+                            foreach ($sqlMissingAssembly in $sqlMissingAssemblies) {
+                                [void]$tbSPmissingAssemblies.Add([SPMissingAssemblyInfo]@{
+                                        Database      = "$($spContentDB.Name)";
+                                        Category      = $missingAssembly.Category;
+                                        Message       = $missingAssembly.Message;
+                                        Remedy        = $missingAssembly.Remedy;
+                                        AssemblyInfo  = $assemblyInfo;
+                                        AssemblyID    = $sqlMissingAssembly.AssemblyID;
+                                        SiteID        = $sqlMissingAssembly.SiteID;
+                                        WebID         = $sqlMissingAssembly.WebID;
+                                        HostID        = $sqlMissingAssembly.HostID;
+                                        HostType      = $sqlMissingAssembly.HostType;
+                                        LookupStatus  = 'Found';
+                                        LookupDetails = '';
                                     })
                             }
                         }
