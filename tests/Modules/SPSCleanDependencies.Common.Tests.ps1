@@ -291,6 +291,44 @@ Describe 'Export-SPSCleanDependenciesReport' {
         { Export-SPSCleanDependenciesReport -InputFile (Join-Path $script:reportRoot 'nope.json') -OutputFile $script:outHtml } |
             Should -Throw
     }
+
+    It 'includes MissingAssembly lookup diagnostics in the HTML payload' {
+        $sample = [ordered]@{
+            MissingAssembly = @(
+                @{
+                    Database     = 'WSS'
+                    AssemblyInfo = 'TrendMicro.PortalProtect.hookWCUtility, Version=2.5.0.0'
+                    AssemblyID   = ''
+                    HostType     = ''
+                    HostID       = ''
+                    SiteID       = ''
+                    WebID        = ''
+                    LookupStatus = 'LookupError'
+                    LookupDetails = 'SQL lookup failed for database WSS'
+                },
+                @{
+                    Database     = 'WSS'
+                    AssemblyInfo = 'TrendMicro.PortalProtect.hookWCUtility, Version=2.5.0.0'
+                    AssemblyID   = ''
+                    HostType     = ''
+                    HostID       = ''
+                    SiteID       = ''
+                    WebID        = ''
+                    LookupStatus = 'NotFound'
+                    LookupDetails = 'No matching EventReceivers rows were found'
+                }
+            )
+        }
+        $sample | ConvertTo-Json -Depth 6 | Set-Content -Path $script:inJson -Encoding UTF8
+
+        [void](Export-SPSCleanDependenciesReport -InputFile $script:inJson -OutputFile $script:outHtml)
+        $html = Get-Content -Path $script:outHtml -Raw
+        $html | Should -Match 'Lookup Status'
+        $html | Should -Match 'Lookup Details'
+        $html | Should -Match 'LookupError'
+        $html | Should -Match 'NotFound'
+        $html | Should -Match 'SQL lookup failed for database WSS'
+    }
 }
 
 Describe 'SPSCleanDependencies.Common Function Parameter Contracts' {

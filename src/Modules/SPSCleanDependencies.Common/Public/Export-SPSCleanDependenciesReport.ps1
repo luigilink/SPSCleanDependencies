@@ -117,6 +117,8 @@
                 @{ field = 'HostID'; label = 'Host ID'; type = 'text' }
                 @{ field = 'SiteID'; label = 'Site ID'; type = 'text' }
                 @{ field = 'WebID'; label = 'Web ID'; type = 'text' }
+                @{ field = 'LookupStatus'; label = 'Lookup Status'; type = 'text' }
+                @{ field = 'LookupDetails'; label = 'Lookup Details'; type = 'text' }
             ) }
         [PSCustomObject]@{ Key = 'Configuration'; Label = 'Configuration (Classic Auth Admins)'; Columns = @(
                 @{ field = 'Database'; label = 'Database'; type = 'text' }
