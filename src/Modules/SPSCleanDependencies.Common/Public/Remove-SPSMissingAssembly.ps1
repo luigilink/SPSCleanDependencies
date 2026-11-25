@@ -47,7 +47,7 @@
         switch ($HostType) {
             '0' {
                 Write-Output ' * HostTypeValue: 0 => SPSite'
-                $site = Get-SPSite -Limit ALL -Identity $SiteID -ErrorAction SilentlyContinue
+                $site = Get-SPSite -Limit ALL -Identity $SiteID -ErrorAction Stop
                 if ($null -ne $site) {
                     try {
                         $assemblyToDelete = $site.EventReceivers | Where-Object -FilterScript {
@@ -73,7 +73,7 @@
             }
             '1' {
                 Write-Output ' * HostTypeValue: 1 => SPWeb'
-                $web = Get-SPWeb -Identity $WebID -Site $SiteID -Limit ALL -ErrorAction SilentlyContinue
+                $web = Get-SPWeb -Identity $WebID -Site $SiteID -Limit ALL -ErrorAction Stop
                 if ($null -ne $web) {
                     try {
                         $assemblyToDelete = $web.EventReceivers | Where-Object -FilterScript {
@@ -99,7 +99,7 @@
             }
             '2' {
                 Write-Output ' * HostTypeValue: 2 => SPList'
-                $web = Get-SPWeb -Identity $WebID -Site $SiteID -Limit ALL -ErrorAction SilentlyContinue
+                $web = Get-SPWeb -Identity $WebID -Site $SiteID -Limit ALL -ErrorAction Stop
                 if ($null -ne $web) {
                     try {
                         $list = $web.Lists | Where-Object -FilterScript { $_.Id -eq $HostID }
