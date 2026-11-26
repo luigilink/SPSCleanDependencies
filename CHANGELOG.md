@@ -3,6 +3,14 @@
 The format is based on and uses the types of changes according to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-11-26
+
+### Changed
+
+- `SPSCleanDependencies.ps1` clean runs now produce explicit operation outcomes (`Completed` / `Skipped` / `Failed`) with a final summary and non-zero exit when failures occur; JSON input parsing and audit/report steps now fail fast instead of silently continuing. [issue #15](https://github.com/luigilink/SPSCleanDependencies/issues/15)
+- MissingAssembly audit diagnostics now persist `LookupStatus` and `LookupDetails` from SQL resolution, and the HTML report includes those columns to distinguish `Found`, `NotFound`, `LookupError`, and `ParseError` outcomes. [issue #16](https://github.com/luigilink/SPSCleanDependencies/issues/16)
+- MissingAssembly cleanup contract is now stricter: HostType-aware required-field validation, explicit skip of diagnostic-only entries, and clearer contextual errors from lookup/removal paths. [issue #17](https://github.com/luigilink/SPSCleanDependencies/issues/17)
+
 ## [2.0.0] - 2026-09-01
 
 ### Removed
