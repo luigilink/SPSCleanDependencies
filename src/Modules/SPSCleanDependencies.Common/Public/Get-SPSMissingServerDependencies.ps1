@@ -180,6 +180,9 @@ function Get-SPSMissingServerDependencies {
                                 -AssemblyInfo "$($assemblyInfo)"
 
                             foreach ($sqlMissingAssembly in $sqlMissingAssemblies) {
+                                if ($sqlMissingAssembly -is [System.Management.Automation.ErrorRecord]) {
+                                    throw ("Get-SQLMissingAssemblyInfo returned an error for database '{0}' assembly '{1}': {2}" -f $spContentDB.Name, $assemblyInfo, $sqlMissingAssembly.Exception.Message)
+                                }
                                 [void]$tbSPmissingAssemblies.Add([SPMissingAssemblyInfo]@{
                                         Database     = "$($spContentDB.Name)";
                                         Category     = $missingAssembly.Category;

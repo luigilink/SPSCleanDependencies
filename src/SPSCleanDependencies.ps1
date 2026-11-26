@@ -102,8 +102,15 @@ function Invoke-SPSOperationWithStatus {
         $ScriptBlock
     )
 
-    $operationOutput = @(& $ScriptBlock 2>&1)
+    $operationOutput = @()
     $operationErrors = New-Object -TypeName System.Collections.ArrayList
+
+    try {
+        $operationOutput = @(& $ScriptBlock 2>&1)
+    }
+    catch {
+        [void]$operationErrors.Add($_)
+    }
 
     foreach ($item in $operationOutput) {
         if ($item -is [System.Management.Automation.ErrorRecord]) {
@@ -270,7 +277,7 @@ try {
         Write-Output 'Removing Missing Server Side Dependency References'
         Write-Output "Getting content of json: $pathJsonFile"
         if (Test-Path $pathJsonFile) {
-            $jsonEnvCfg = Get-Content -Path $pathJsonFile -Raw | ConvertFrom-Json
+            $jsonEnvCfg = Get-Content -Path $pathJsonFile -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
 
             $missingFeatures = @($jsonEnvCfg.MissingFeature | Where-Object -FilterScript { $null -ne $_ })
             if ($missingFeatures.Count -ne 0) {
