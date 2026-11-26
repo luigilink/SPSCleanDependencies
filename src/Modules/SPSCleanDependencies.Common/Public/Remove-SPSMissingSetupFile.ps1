@@ -28,10 +28,10 @@
         Write-Output " * WebID: $WebID"
         Write-Output '-----------------------------------------------'
         #Display site information
-        $site = Get-SPSite $SiteID -ErrorAction SilentlyContinue
+        $site = Get-SPSite $SiteID -ErrorAction Stop
         if ($null -ne $site) {
             Write-Output "Checking SPSite: $($site.Url)"
-            $web = Get-SPWeb -Identity $WebID -Site $siteID -Limit ALL
+            $web = Get-SPWeb -Identity $WebID -Site $siteID -Limit ALL -ErrorAction Stop
             if ($null -ne $web) {
                 Write-Output "Checking SPWeb Object ID: $WebID"
                 $file = $web.GetFile([GUID]$FileID)
@@ -58,6 +58,6 @@
         }
     }
     catch {
-        return $_
+        Throw ("Remove-SPSMissingSetupFile failed (Database='{0}', FileID='{1}', SiteID='{2}', WebID='{3}'). {4}" -f $Database, $FileID, $SiteID, $WebID, $_.Exception.Message)
     }
 }

@@ -23,7 +23,7 @@
         Write-Output " * SiteID: $SiteID"
         Write-Output '-----------------------------------------------'
         #Display site information
-        $site = Get-SPSite $SiteID -ErrorAction SilentlyContinue
+        $site = Get-SPSite $SiteID -ErrorAction Stop
         if ($null -ne $site) {
             Write-Output "Checking SPSite: $($site.Url)"
             #Remove the feature from all subsites
@@ -54,6 +54,6 @@
         }
     }
     catch {
-        return $_
+        Throw ("Remove-SPSMissingFeature failed (Database='{0}', FeatureID='{1}', SiteID='{2}'). {3}" -f $Database, $FeatureID, $SiteID, $_.Exception.Message)
     }
 }
