@@ -519,6 +519,49 @@ Describe 'Get-SPSMissingServerDependencies MissingAssembly lookup diagnostics' {
     }
 }
 
+Describe 'Remove-SPSMissingAssembly input contract safety' {
+
+    It 'rejects unsupported HostType values before execution' {
+        {
+            Remove-SPSMissingAssembly `
+                -Database 'WSS_Content_Test' `
+                -AssemblyID '11111111-1111-1111-1111-111111111111' `
+                -SiteID '22222222-2222-2222-2222-222222222222' `
+                -WebID '33333333-3333-3333-3333-333333333333' `
+                -HostType '9' `
+                -HostID '44444444-4444-4444-4444-444444444444'
+        } | Should -Throw '*Cannot validate argument on parameter ''HostType''*'
+    }
+
+    It 'rejects empty HostID values when invoking cleanup' {
+        {
+            Remove-SPSMissingAssembly `
+                -Database 'WSS_Content_Test' `
+                -AssemblyID '11111111-1111-1111-1111-111111111111' `
+                -SiteID '22222222-2222-2222-2222-222222222222' `
+                -WebID '33333333-3333-3333-3333-333333333333' `
+                -HostType '2' `
+                -HostID ''
+        } | Should -Throw '*Cannot validate argument on parameter ''HostID''*'
+    }
+
+    It 'throws contextual error when runtime delete path fails' {
+        InModuleScope -ModuleName 'SPSCleanDependencies.Common' {
+            Mock Get-SPWeb { Throw 'forced Get-SPWeb failure' }
+
+            {
+                Remove-SPSMissingAssembly `
+                    -Database 'WSS_Content_Test' `
+                    -AssemblyID '11111111-1111-1111-1111-111111111111' `
+                    -SiteID '22222222-2222-2222-2222-222222222222' `
+                    -WebID '33333333-3333-3333-3333-333333333333' `
+                    -HostType '2' `
+                    -HostID '44444444-4444-4444-4444-444444444444'
+            } | Should -Throw '*Remove-SPSMissingAssembly failed*forced Get-SPWeb failure*'
+        }
+    }
+}
+
 Describe 'SPSCleanDependencies.Common Class Definitions' {
 
     BeforeAll {
