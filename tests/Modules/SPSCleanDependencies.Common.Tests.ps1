@@ -118,6 +118,45 @@ Describe 'SPSCleanDependencies.Common Private SQL Helpers' {
     It 'does not export the SQL helpers to callers <_>' -ForEach $sqlHelpers {
         (Get-Module -Name $script:moduleName).ExportedFunctions.Keys | Should -Not -Contain $_
     }
+
+    It 'Get-SQLMissingAssemblyInfo escapes SQL literals and maps returned fields' {
+        InModuleScope -ModuleName 'SPSCleanDependencies.Common' {
+            $script:lastQuery = $null
+            Mock Invoke-Sqlcmd {
+                param($Query)
+                $script:lastQuery = $Query
+                [PSCustomObject]@{
+                    Id       = 'A1'
+                    SiteID   = 'S1'
+                    WebID    = 'W1'
+                    HostID   = 'H1'
+                    HostType = 2
+                }
+            }
+
+            $rows = Get-SQLMissingAssemblyInfo `
+                -DatabaseName "WSS_Content_OECD]Prod" `
+                -DatabaseServer 'SQL01' `
+                -AssemblyInfo "Contoso.Assembly, Version=1.0.0.0, Culture=neutral, PublicKeyToken=abc'def"
+
+            $rows.Count | Should -Be 1
+            $rows[0].AssemblyID | Should -Be 'A1'
+            $rows[0].HostType | Should -Be '2'
+            $script:lastQuery | Should -Match 'USE \[WSS_Content_OECD\]\]Prod\]'
+            $script:lastQuery | Should -Match "PublicKeyToken=abc''def"
+            $script:lastQuery | Should -Match 'WITH \(NOLOCK\)'
+        }
+    }
+
+    It 'Get-SQLMissingAssemblyInfo throws with context when lookup fails' {
+        InModuleScope -ModuleName 'SPSCleanDependencies.Common' {
+            Mock Invoke-Sqlcmd { Throw 'SQL unavailable' }
+
+            {
+                Get-SQLMissingAssemblyInfo -DatabaseName 'WSS_Content' -DatabaseServer 'SQL01' -AssemblyInfo 'Contoso.Assembly'
+            } | Should -Throw '*Get-SQLMissingAssemblyInfo failed*WSS_Content*SQL01*Contoso.Assembly*'
+        }
+    }
 }
 
 Describe 'SPSCleanDependencies.Common Private HTML Report Helpers' {
@@ -252,6 +291,44 @@ Describe 'Export-SPSCleanDependenciesReport' {
         { Export-SPSCleanDependenciesReport -InputFile (Join-Path $script:reportRoot 'nope.json') -OutputFile $script:outHtml } |
             Should -Throw
     }
+
+    It 'includes MissingAssembly lookup diagnostics in the HTML payload' {
+        $sample = [ordered]@{
+            MissingAssembly = @(
+                @{
+                    Database     = 'WSS'
+                    AssemblyInfo = 'TrendMicro.PortalProtect.hookWCUtility, Version=2.5.0.0'
+                    AssemblyID   = ''
+                    HostType     = ''
+                    HostID       = ''
+                    SiteID       = ''
+                    WebID        = ''
+                    LookupStatus = 'LookupError'
+                    LookupDetails = 'SQL lookup failed for database WSS'
+                },
+                @{
+                    Database     = 'WSS'
+                    AssemblyInfo = 'TrendMicro.PortalProtect.hookWCUtility, Version=2.5.0.0'
+                    AssemblyID   = ''
+                    HostType     = ''
+                    HostID       = ''
+                    SiteID       = ''
+                    WebID        = ''
+                    LookupStatus = 'NotFound'
+                    LookupDetails = 'No matching EventReceivers rows were found'
+                }
+            )
+        }
+        $sample | ConvertTo-Json -Depth 6 | Set-Content -Path $script:inJson -Encoding UTF8
+
+        [void](Export-SPSCleanDependenciesReport -InputFile $script:inJson -OutputFile $script:outHtml)
+        $html = Get-Content -Path $script:outHtml -Raw
+        $html | Should -Match 'Lookup Status'
+        $html | Should -Match 'Lookup Details'
+        $html | Should -Match 'LookupError'
+        $html | Should -Match 'NotFound'
+        $html | Should -Match 'SQL lookup failed for database WSS'
+    }
 }
 
 Describe 'SPSCleanDependencies.Common Function Parameter Contracts' {
@@ -340,6 +417,105 @@ Describe 'SPSCleanDependencies.Common ShouldProcess Support' {
         # CmdletBinding(SupportsShouldProcess) injects -WhatIf and -Confirm into the function.
         $cmd.Parameters.Keys | Should -Contain 'WhatIf'
         $cmd.Parameters.Keys | Should -Contain 'Confirm'
+    }
+}
+
+Describe 'Get-SPSMissingServerDependencies MissingAssembly lookup diagnostics' {
+
+    It 'records Found status when SQL lookup returns matching EventReceivers rows' {
+        $outPath = Join-Path -Path $TestDrive -ChildPath 'found.json'
+
+        InModuleScope -ModuleName 'SPSCleanDependencies.Common' -Parameters @{ outPath = $outPath } {
+            param($outPath)
+
+            Mock Get-SPContentDatabase {
+                [PSCustomObject]@{
+                    Name   = 'WSS_Content_Test'
+                    Server = 'SQL01'
+                }
+            }
+            Mock Test-SPContentDatabase {
+                [PSCustomObject]@{
+                    Category = 'MissingAssembly'
+                    Message  = 'Feature references [TrendMicro.PortalProtect.hookWCUtility, Version=2.5.0.0, Culture=neutral, PublicKeyToken=3d25d8fff8a3665b]'
+                    Remedy   = 'Remove reference'
+                }
+            }
+            Mock Get-SQLMissingAssemblyInfo {
+                [PSCustomObject]@{
+                    AssemblyID = 'A1'
+                    SiteID     = 'S1'
+                    WebID      = 'W1'
+                    HostID     = 'H1'
+                    HostType   = '2'
+                }
+            }
+
+            [void](Get-SPSMissingServerDependencies -Path $outPath)
+        }
+
+        $json = Get-Content -Path $outPath -Raw | ConvertFrom-Json
+        $json.MissingAssembly[0].LookupStatus | Should -Be 'Found'
+        $json.MissingAssembly[0].AssemblyID | Should -Be 'A1'
+        $json.MissingAssembly[0].HostType | Should -Be '2'
+    }
+
+    It 'records NotFound status when SQL lookup returns no matching rows' {
+        $outPath = Join-Path -Path $TestDrive -ChildPath 'notfound.json'
+
+        InModuleScope -ModuleName 'SPSCleanDependencies.Common' -Parameters @{ outPath = $outPath } {
+            param($outPath)
+
+            Mock Get-SPContentDatabase {
+                [PSCustomObject]@{
+                    Name   = 'WSS_Content_Test'
+                    Server = 'SQL01'
+                }
+            }
+            Mock Test-SPContentDatabase {
+                [PSCustomObject]@{
+                    Category = 'MissingAssembly'
+                    Message  = 'Feature references [TrendMicro.PortalProtect.hookWCUtility, Version=2.5.0.0, Culture=neutral, PublicKeyToken=3d25d8fff8a3665b]'
+                    Remedy   = 'Remove reference'
+                }
+            }
+            Mock Get-SQLMissingAssemblyInfo { @() }
+
+            [void](Get-SPSMissingServerDependencies -Path $outPath)
+        }
+
+        $json = Get-Content -Path $outPath -Raw | ConvertFrom-Json
+        $json.MissingAssembly[0].LookupStatus | Should -Be 'NotFound'
+        $json.MissingAssembly[0].LookupDetails | Should -Match 'No matching EventReceivers'
+    }
+
+    It 'records LookupError status when SQL lookup throws' {
+        $outPath = Join-Path -Path $TestDrive -ChildPath 'lookuperror.json'
+
+        InModuleScope -ModuleName 'SPSCleanDependencies.Common' -Parameters @{ outPath = $outPath } {
+            param($outPath)
+
+            Mock Get-SPContentDatabase {
+                [PSCustomObject]@{
+                    Name   = 'WSS_Content_Test'
+                    Server = 'SQL01'
+                }
+            }
+            Mock Test-SPContentDatabase {
+                [PSCustomObject]@{
+                    Category = 'MissingAssembly'
+                    Message  = 'Feature references [TrendMicro.PortalProtect.hookWCUtility, Version=2.5.0.0, Culture=neutral, PublicKeyToken=3d25d8fff8a3665b]'
+                    Remedy   = 'Remove reference'
+                }
+            }
+            Mock Get-SQLMissingAssemblyInfo { Throw 'SQL lookup failed in test' }
+
+            [void](Get-SPSMissingServerDependencies -Path $outPath)
+        }
+
+        $json = Get-Content -Path $outPath -Raw | ConvertFrom-Json
+        $json.MissingAssembly[0].LookupStatus | Should -Be 'LookupError'
+        $json.MissingAssembly[0].LookupDetails | Should -Match 'SQL lookup failed in test'
     }
 }
 
