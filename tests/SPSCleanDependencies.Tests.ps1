@@ -170,6 +170,11 @@ Describe 'SPSCleanDependencies.ps1 Clean Branch' {
         $script:scriptContent | Should -Match 'Remove-SPSMissingAssembly\s+-Database'
     }
 
+    It 'Should skip MissingAssembly cleanup when LookupStatus is not Found' {
+        $script:scriptContent | Should -Match "LookupStatus"
+        $script:scriptContent | Should -Match 'Skipping Missing Assembly cleanup'
+    }
+
     It 'Should call Remove-SPSMissingConfiguration in the Clean branch' {
         $script:scriptContent | Should -Match 'Remove-SPSMissingConfiguration\s+-Database'
     }
